@@ -72,11 +72,11 @@ export default function RFQPage() {
       const data = await res.json();
 
       if (data.success) {
-        toast.success('Quotation request submitted successfully!');
+        toast.success('Quotation request submitted successfully! Redirecting...');
         clearCart();
         setTimeout(() => {
           router.push('/');
-        }, 2000);
+        }, 1500);
       } else {
         toast.error('Failed to submit request. Please try again.');
       }

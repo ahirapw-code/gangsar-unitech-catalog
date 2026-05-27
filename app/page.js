@@ -20,9 +20,13 @@ export default function HomePage() {
     async function fetchData() {
       try {
         const [promoRes, categoriesRes] = await Promise.all([
-          fetch('/api/products?promo=true&limit=6'),
-          fetch('/api/categories')
+          fetch('/api/products?promo=true&limit=6', { cache: 'no-store' }),
+          fetch('/api/categories', { cache: 'no-store' })
         ]);
+        
+        if (!promoRes.ok || !categoriesRes.ok) {
+          throw new Error('Failed to fetch data');
+        }
         
         const promoData = await promoRes.json();
         const categoriesData = await categoriesRes.json();
@@ -31,6 +35,9 @@ export default function HomePage() {
         setCategories(categoriesData || []);
       } catch (error) {
         console.error('Error fetching data:', error);
+        // Set empty arrays on error to prevent crash
+        setPromoProducts([]);
+        setCategories([]);
       } finally {
         setLoading(false);
       }
