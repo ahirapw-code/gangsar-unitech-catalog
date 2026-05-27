@@ -195,10 +195,12 @@ export default function AdminDashboardPage() {
           <Card>
             <CardHeader className="flex flex-row items-center justify-between">
               <CardTitle>Recent Products</CardTitle>
-              <Button size="sm" className="bg-[#1E8E5A] hover:bg-[#15663f]">
-                <Plus className="mr-2 h-4 w-4" />
-                Add Product
-              </Button>
+              <Link href="/admin/products">
+                <Button size="sm" className="bg-[#1E8E5A] hover:bg-[#15663f]">
+                  <Package className="mr-2 h-4 w-4" />
+                  Manage Products
+                </Button>
+              </Link>
             </CardHeader>
             <CardContent>
               {loadingData ? (
@@ -238,6 +240,12 @@ export default function AdminDashboardPage() {
           <Card>
             <CardHeader className="flex flex-row items-center justify-between">
               <CardTitle>Recent RFQs</CardTitle>
+              <Link href="/admin/rfq">
+                <Button size="sm" variant="outline">
+                  <FileText className="mr-2 h-4 w-4" />
+                  View All RFQs
+                </Button>
+              </Link>
             </CardHeader>
             <CardContent>
               {loadingData ? (
