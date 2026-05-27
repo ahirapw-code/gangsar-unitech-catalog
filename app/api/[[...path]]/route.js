@@ -40,7 +40,10 @@ export async function GET(request) {
 
     // Get all categories
     if (path === 'categories') {
-      const categories = await db.collection('categories').find({}).toArray();
+      const categories = await db.collection('categories')
+        .find({}, { projection: { name: 1, slug: 1, image: 1, description: 1, id: 1 } })
+        .limit(50)
+        .toArray();
       return NextResponse.json(categories);
     }
 
@@ -155,6 +158,7 @@ export async function GET(request) {
       const rfqs = await db.collection('rfqs')
         .find({})
         .sort({ createdAt: -1 })
+        .limit(100)
         .toArray();
       
       return NextResponse.json(rfqs);
