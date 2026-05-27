@@ -54,6 +54,11 @@ export default function Footer() {
                   Request Quote
                 </Link>
               </li>
+              <li>
+                <Link href="/admin/login" className="hover:text-[#1E8E5A] transition-colors text-gray-400">
+                  Admin Login
+                </Link>
+              </li>
             </ul>
           </div>
 
