@@ -4,13 +4,21 @@ const nextConfig = {
     unoptimized: true,
     remotePatterns: [
       { protocol: 'https', hostname: 'avatars.githubusercontent.com', pathname: '/**' },
+      { protocol: 'https', hostname: 'images.unsplash.com', pathname: '/**' },
+      { protocol: 'https', hostname: 'images.pexels.com', pathname: '/**' },
     ],
   },
   experimental: {
     // Remove if not using Server Components
     serverComponentsExternalPackages: ['mongodb'],
   },
-  webpack(config, { dev }) {
+  webpack(config, { dev, isServer }) {
+    // Add path resolution
+    config.resolve.alias = {
+      ...config.resolve.alias,
+      '@': __dirname,
+    };
+    
     if (dev) {
       // Reduce CPU/memory from file watching
       config.watchOptions = {
