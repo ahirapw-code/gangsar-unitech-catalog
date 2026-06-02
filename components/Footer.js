@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import Image from 'next/image';
 import { MapPin, Phone, Mail } from 'lucide-react';
 
 export default function Footer() {
@@ -111,23 +112,31 @@ export default function Footer() {
                 href="https://maps.google.com/?q=Gangsar+Unitech+Surabaya" 
                 target="_blank"
                 rel="noopener noreferrer"
-                className="hover:text-[#1E8E5A] transition-colors"
+                className="hover:opacity-80 transition-opacity"
                 title="Find us on Google Maps"
               >
-                <svg className="h-5 w-5" fill="currentColor" viewBox="0 0 24 24">
-                  <path d="M12 0C7.31 0 3.5 3.81 3.5 8.5c0 5.25 7.5 13.5 8.5 14.5 1-1 8.5-9.25 8.5-14.5C20.5 3.81 16.69 0 12 0zm0 11.5c-1.66 0-3-1.34-3-3s1.34-3 3-3 3 1.34 3 3-1.34 3-3 3z"/>
-                </svg>
+                <Image 
+                  src="/icons/google-maps.svg"
+                  width={20}
+                  height={20}
+                  alt="Google Maps"
+                  className="text-gray-300 hover:text-[#1E8E5A]"
+                />
               </a>
               <a 
                 href="https://www.tokopedia.com/gangsarunitech" 
                 target="_blank"
                 rel="noopener noreferrer"
-                className="hover:text-[#1E8E5A] transition-colors"
+                className="hover:opacity-80 transition-opacity"
                 title="Visit our Tokopedia Store"
               >
-                <svg className="h-5 w-5" fill="currentColor" viewBox="0 0 24 24">
-                  <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm-1-13h2v6h-2zm0 8h2v2h-2z"/>
-                </svg>
+                <Image 
+                  src="/icons/tokopedia.svg"
+                  width={20}
+                  height={20}
+                  alt="Tokopedia"
+                  className="text-gray-300 hover:text-[#1E8E5A]"
+                />
               </a>
             </div>
           </div>
