@@ -45,7 +45,3 @@ export async function GET(request) {
     }, { status: 500 });
   }
 }
-return NextResponse.json({
-  products: [...],  // array produk untuk halaman ini saja
-  total: 1000,       // TOTAL semua produk (bukan hanya yang dikembalikan)
-});
