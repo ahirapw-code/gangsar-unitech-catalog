@@ -108,7 +108,8 @@ export default function Footer() {
               </li>
             </ul>
           <div className="flex space-x-4 mt-6">
-  {/* Google Maps — icon putih */}
+ <div className="flex space-x-4 mt-6">
+  {/* Google Maps */}
   
     href="https://maps.google.com/?q=Gangsar+Unitech+Surabaya"
     target="_blank"
@@ -134,7 +135,7 @@ export default function Footer() {
     </svg>
   </a>
 
-  {/* Instagram — baru */}
+  {/* Instagram */}
   
     href="https://www.instagram.com/gangsarunitechindonesia?igsh=MWh3ZnQ1bGw0N3k2MA%3D%3D"
     target="_blank"
@@ -147,8 +148,6 @@ export default function Footer() {
     </svg>
   </a>
 </div>
-          </div>
-        </div>
 
         <div className="border-t border-gray-800 mt-8 pt-8 text-center text-sm text-gray-400">
           <p>&copy; {currentYear} Gangsar Unitech. All rights reserved.</p>
