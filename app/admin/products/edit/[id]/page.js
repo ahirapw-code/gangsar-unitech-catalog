@@ -13,6 +13,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Switch } from '@/components/ui/switch';
 import { useAdmin } from '@/contexts/AdminContext';
 import { toast } from 'sonner';
+import ImageUploader from '@/components/ImageUploader';
 
 export default function EditProductPage() {
   const router = useRouter();
@@ -21,6 +22,7 @@ export default function EditProductPage() {
   const [categories, setCategories] = useState([]);
   const [loadingProduct, setLoadingProduct] = useState(true);
   const [submitting, setSubmitting] = useState(false);
+  const [originalImages, setOriginalImages] = useState([]); // simpan gambar asli sebelum diedit
   
   const [formData, setFormData] = useState(null);
 
@@ -46,11 +48,13 @@ export default function EditProductPage() {
       
       const product = productsData.products?.find(p => p.id === params.id);
       if (product) {
+        const images = product.images || [''];
+        setOriginalImages(images); // simpan gambar asli untuk perbandingan nanti
         setFormData({
           ...product,
           price: product.price.toString(),
           originalPrice: product.originalPrice?.toString() || product.price.toString(),
-          images: product.images || [''],
+          images: images,
           specifications: product.specifications && product.specifications.length > 0 
             ? product.specifications 
             : [{ label: '', value: '' }]
@@ -76,24 +80,6 @@ export default function EditProductPage() {
     });
   };
 
-  const addImage = () => {
-    setFormData({
-      ...formData,
-      images: [...formData.images, '']
-    });
-  };
-
-  const updateImage = (index, value) => {
-    const newImages = [...formData.images];
-    newImages[index] = value;
-    setFormData({ ...formData, images: newImages });
-  };
-
-  const removeImage = (index) => {
-    const newImages = formData.images.filter((_, i) => i !== index);
-    setFormData({ ...formData, images: newImages.length > 0 ? newImages : [''] });
-  };
-
   const addSpecification = () => {
     setFormData({
       ...formData,
@@ -112,12 +98,48 @@ export default function EditProductPage() {
     setFormData({ ...formData, specifications: newSpecs.length > 0 ? newSpecs : [{ label: '', value: '' }] });
   };
 
+  // Cari gambar yang dihapus (ada di originalImages tapi tidak ada di formData.images saat ini)
+  const getDeletedImages = (newImages) => {
+    return originalImages.filter(
+      oldImg => oldImg && oldImg.trim() !== '' && !newImages.includes(oldImg)
+    );
+  };
+
+  // Hapus gambar dari Vercel Blob storage
+  const deleteImagesFromServer = async (imagesToDelete) => {
+    if (!imagesToDelete || imagesToDelete.length === 0) return;
+
+    const deletePromises = imagesToDelete
+      // Hanya hapus gambar yang memang tersimpan di Vercel Blob (bukan URL eksternal)
+      .filter(imageUrl => imageUrl && imageUrl.includes('blob.vercel-storage.com'))
+      .map(imageUrl =>
+        fetch('/api/upload', {
+          method: 'DELETE',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ imageUrl })
+        }).catch(err => {
+          // Jangan hentikan proses update produk jika delete gagal
+          console.warn('Failed to delete image from Vercel Blob:', imageUrl, err);
+        })
+      );
+
+    await Promise.allSettled(deletePromises);
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setSubmitting(true);
 
     const token = getToken();
     
+    const filteredImages = formData.images.filter(img => img && img.trim() !== '');
+    
+    // Cari dan hapus gambar yang sudah diganti/dihapus user
+    const deletedImages = getDeletedImages(filteredImages);
+    if (deletedImages.length > 0) {
+      await deleteImagesFromServer(deletedImages);
+    }
+
     // Calculate discount if promo
     let discount = 0;
     if (formData.isPromo && formData.originalPrice && formData.price) {
@@ -129,7 +151,7 @@ export default function EditProductPage() {
       price: parseFloat(formData.price),
       originalPrice: formData.isPromo ? parseFloat(formData.originalPrice || formData.price) : parseFloat(formData.price),
       discount: formData.isPromo ? discount : 0,
-      images: formData.images.filter(img => img.trim() !== ''),
+      images: filteredImages,
       specifications: formData.specifications.filter(spec => spec.label && spec.value)
     };
 
@@ -331,36 +353,16 @@ export default function EditProductPage() {
                 </CardContent>
               </Card>
 
-              {/* Images */}
+              {/* Images — sekarang pakai ImageUploader sama seperti Add Product */}
               <Card>
-                <CardHeader className="flex flex-row items-center justify-between">
+                <CardHeader>
                   <CardTitle>Product Images</CardTitle>
-                  <Button type="button" size="sm" variant="outline" onClick={addImage}>
-                    <Plus className="h-4 w-4 mr-1" />
-                    Add Image
-                  </Button>
                 </CardHeader>
-                <CardContent className="space-y-3">
-                  {formData.images.map((image, index) => (
-                    <div key={index} className="flex gap-2">
-                      <Input
-                        placeholder="Image URL"
-                        value={image}
-                        onChange={(e) => updateImage(index, e.target.value)}
-                        className="flex-1"
-                      />
-                      {formData.images.length > 1 && (
-                        <Button
-                          type="button"
-                          size="icon"
-                          variant="ghost"
-                          onClick={() => removeImage(index)}
-                        >
-                          <X className="h-4 w-4" />
-                        </Button>
-                      )}
-                    </div>
-                  ))}
+                <CardContent>
+                  <ImageUploader
+                    images={formData.images}
+                    onImagesChange={(newImages) => setFormData({ ...formData, images: newImages })}
+                  />
                 </CardContent>
               </Card>
             </div>
