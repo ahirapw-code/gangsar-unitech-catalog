@@ -84,7 +84,7 @@ export default function HomePage() {
                 </Button>
               </Link>
               <Link href="/rfq">
-                <Button size="lg" variant="outline" className="border-white text-white hover:bg-white hover:text-gray-900">
+                <Button size="lg" variant="outline" className="border-white text-white bg-white/10 hover:bg-white hover:text-gray-900">
                   Request Quotation
                 </Button>
               </Link>
