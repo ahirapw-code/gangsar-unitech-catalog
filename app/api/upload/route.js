@@ -1,6 +1,5 @@
 import { NextResponse } from 'next/server';
-import { writeFile } from 'fs/promises';
-import path from 'path';
+import { put, del } from '@vercel/blob';
 
 export async function POST(request) {
   try {
@@ -14,27 +13,28 @@ export async function POST(request) {
       );
     }
 
-    // Convert file to buffer
-    const bytes = await file.arrayBuffer();
-    const buffer = Buffer.from(bytes);
+    // Check file size (max 5MB)
+    if (file.size > 5 * 1024 * 1024) {
+      return NextResponse.json(
+        { error: 'File size must be less than 5MB' },
+        { status: 400 }
+      );
+    }
 
     // Generate unique filename
-    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+    const timestamp = Date.now();
     const filename = file.name.replace(/\s+/g, '-').toLowerCase();
-    const uniqueFilename = `${uniqueSuffix}-${filename}`;
+    const uniqueFilename = `products/${timestamp}-${filename}`;
 
-    // Save to public/uploads/products
-    const uploadDir = path.join(process.cwd(), 'public', 'uploads', 'products');
-    const filepath = path.join(uploadDir, uniqueFilename);
-
-    await writeFile(filepath, buffer);
-
-    // Return the public URL
-    const imageUrl = `/uploads/products/${uniqueFilename}`;
+    // Upload to Vercel Blob
+    const blob = await put(uniqueFilename, file, {
+      access: 'public',
+      addRandomSuffix: false,
+    });
 
     return NextResponse.json({
       success: true,
-      imageUrl,
+      imageUrl: blob.url,
       message: 'Image uploaded successfully'
     });
 
@@ -47,23 +47,20 @@ export async function POST(request) {
   }
 }
 
-// Allow deleting uploaded images
+// Delete image from Vercel Blob
 export async function DELETE(request) {
   try {
     const { imageUrl } = await request.json();
     
-    if (!imageUrl || !imageUrl.startsWith('/uploads/products/')) {
+    if (!imageUrl) {
       return NextResponse.json(
-        { error: 'Invalid image URL' },
+        { error: 'Image URL is required' },
         { status: 400 }
       );
     }
 
-    const filepath = path.join(process.cwd(), 'public', imageUrl);
-    
-    // Delete the file
-    const fs = require('fs').promises;
-    await fs.unlink(filepath);
+    // Delete from Vercel Blob
+    await del(imageUrl);
 
     return NextResponse.json({
       success: true,

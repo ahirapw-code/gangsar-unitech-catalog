@@ -97,7 +97,7 @@ export default function ImageUploader({ images, onImagesChange }) {
       <div className="space-y-3">
         {images.map((image, index) => (
           <div key={index} className="flex gap-2 items-start">
-            {image && image.startsWith('/uploads/') ? (
+            {image && (image.startsWith('/uploads/') || image.startsWith('https://')) ? (
               <div className="relative w-20 h-20 border rounded overflow-hidden flex-shrink-0">
                 <Image
                   src={image}
