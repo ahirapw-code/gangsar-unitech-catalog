@@ -85,7 +85,7 @@ export default function ContactPage() {
                   <h3 className="font-semibold text-lg mb-2">Email</h3>
                   <p className="text-gray-600 text-sm">
                     <a href="mailto:admin@gangsarunitech.id" className="hover:text-[#1E8E5A]">
-                      info@gangsarunitech.com
+                      admin@gangsarunitech.id
                     </a>
                   </p>
                   <p className="text-gray-500 text-xs mt-1">
