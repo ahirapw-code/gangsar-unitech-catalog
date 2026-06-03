@@ -13,6 +13,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Switch } from '@/components/ui/switch';
 import { useAdmin } from '@/contexts/AdminContext';
 import { toast } from 'sonner';
+import ImageUploader from '@/components/ImageUploader';
 
 export default function AddProductPage() {
   const router = useRouter();
@@ -322,35 +323,14 @@ export default function AddProductPage() {
 
               {/* Images */}
               <Card>
-                <CardHeader className="flex flex-row items-center justify-between">
+                <CardHeader>
                   <CardTitle>Product Images</CardTitle>
-                  <Button type="button" size="sm" variant="outline" onClick={addImage}>
-                    <Plus className="h-4 w-4 mr-1" />
-                    Add Image
-                  </Button>
                 </CardHeader>
-                <CardContent className="space-y-3">
-                  {formData.images.map((image, index) => (
-                    <div key={index} className="flex gap-2">
-                      <Input
-                        placeholder="Image URL"
-                        value={image}
-                        onChange={(e) => updateImage(index, e.target.value)}
-                        className="flex-1"
-                      />
-                      {formData.images.length > 1 && (
-                        <Button
-                          type="button"
-                          size="icon"
-                          variant="ghost"
-                          onClick={() => removeImage(index)}
-                        >
-                          <X className="h-4 w-4" />
-                        </Button>
-                      )}
-                    </div>
-                  ))}
-                  <p className="text-sm text-gray-600">Add direct image URLs (e.g., from Unsplash, Pexels)</p>
+                <CardContent>
+                  <ImageUploader 
+                    images={formData.images}
+                    onImagesChange={(newImages) => setFormData({ ...formData, images: newImages })}
+                  />
                 </CardContent>
               </Card>
             </div>
