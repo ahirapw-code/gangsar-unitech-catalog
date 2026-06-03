@@ -43,10 +43,9 @@ export default function AdminProductsPage() {
   async function fetchData(page, search) {
     setLoadingData(true);
     try {
-      const offset = (page - 1) * PRODUCTS_PER_PAGE;
       const params = new URLSearchParams({
+        page,
         limit: PRODUCTS_PER_PAGE,
-        offset,
         ...(search && { search }),
       });
 
@@ -54,8 +53,8 @@ export default function AdminProductsPage() {
       const data = await res.json();
 
       setProducts(data.products || []);
-      // Gunakan total dari API jika tersedia, fallback ke panjang array
-      setTotalProducts(data.total ?? data.products?.length ?? 0);
+      // API mengembalikan total di dalam object pagination
+      setTotalProducts(data.pagination?.total ?? data.products?.length ?? 0);
     } catch (error) {
       console.error('Error fetching data:', error);
       toast.error('Failed to load products');
