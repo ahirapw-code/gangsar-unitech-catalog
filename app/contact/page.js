@@ -61,8 +61,8 @@ export default function ContactPage() {
                   </div>
                   <h3 className="font-semibold text-lg mb-2">Phone</h3>
                   <p className="text-gray-600 text-sm">
-                    <a href="tel:+625771919132" className="hover:text-[#1E8E5A]">
-                      +62 812-3456-7890
+                    <a href="tel:+6285771919132" className="hover:text-[#1E8E5A]">
+                      +62 857 7191 9132
                     </a>
                   </p>
                   <p className="text-gray-500 text-xs mt-1">
@@ -143,7 +143,7 @@ export default function ContactPage() {
                     </p>
                     <Button
                       className="w-full bg-[#25D366] hover:bg-[#20BA5A]"
-                      onClick={() => window.open('https://wa.me/6281234567890', '_blank')}
+                      onClick={() => window.open('https://wa.me/6285771919132', '_blank')}
                     >
                       Chat Now
                     </Button>
@@ -189,7 +189,7 @@ export default function ContactPage() {
                     <Button
                       variant="outline"
                       className="w-full"
-                      onClick={() => window.location.href = 'tel:+625771919132'}
+                      onClick={() => window.location.href = 'tel:+6285771919132'}
                     >
                       Call Us
                     </Button>
