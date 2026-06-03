@@ -61,7 +61,7 @@ export default function ContactPage() {
                   </div>
                   <h3 className="font-semibold text-lg mb-2">Phone</h3>
                   <p className="text-gray-600 text-sm">
-                    <a href="tel:+6281234567890" className="hover:text-[#1E8E5A]">
+                    <a href="tel:+625771919132" className="hover:text-[#1E8E5A]">
                       +62 812-3456-7890
                     </a>
                   </p>
@@ -84,7 +84,7 @@ export default function ContactPage() {
                   </div>
                   <h3 className="font-semibold text-lg mb-2">Email</h3>
                   <p className="text-gray-600 text-sm">
-                    <a href="mailto:info@gangsarunitech.com" className="hover:text-[#1E8E5A]">
+                    <a href="mailto:admin@gangsarunitech.id" className="hover:text-[#1E8E5A]">
                       info@gangsarunitech.com
                     </a>
                   </p>
@@ -166,7 +166,7 @@ export default function ContactPage() {
                     <Button
                       variant="outline"
                       className="w-full"
-                      onClick={() => window.location.href = 'mailto:info@gangsarunitech.com'}
+                      onClick={() => window.location.href = 'mailto:admin@gangsarunitech.id'}
                     >
                       Send Email
                     </Button>
@@ -189,7 +189,7 @@ export default function ContactPage() {
                     <Button
                       variant="outline"
                       className="w-full"
-                      onClick={() => window.location.href = 'tel:+6281234567890'}
+                      onClick={() => window.location.href = 'tel:+625771919132'}
                     >
                       Call Us
                     </Button>
