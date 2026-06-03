@@ -4,8 +4,7 @@
     "paths": {
       "@/*": ["./*"]
     },
-    "ignoreDeprecations": "6.0"
-  }
+    
     },
     "include": ["next-env.d.js", "**/*.js", "**/*.jsx"],
     "exclude": ["node_modules"]
