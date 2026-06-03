@@ -104,7 +104,7 @@ export default function Footer() {
               </li>
               <li className="flex items-center space-x-3">
                 <Mail className="h-5 w-5 text-[#1E8E5A] flex-shrink-0" />
-                <span className="text-sm">info@gangsarunitech.com</span>
+                <span className="text-sm">admin@gangsarunitech.id</span>
               </li>
             </ul>
             <div className="flex space-x-4 mt-6">
@@ -124,7 +124,7 @@ export default function Footer() {
                 />
               </a>
               <a 
-                href="https://www.tokopedia.com/gangsarunitech" 
+                href="https://www.tokopedia.com/gexpat" 
                 target="_blank"
                 rel="noopener noreferrer"
                 className="hover:opacity-80 transition-opacity"
