@@ -1,7 +1,6 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
 import { motion } from 'framer-motion';
@@ -14,18 +13,16 @@ import { useCart } from '@/contexts/CartContext';
 import { toast } from 'sonner';
 
 export default function ProductsPage() {
-  const searchParams = useSearchParams();
+  const [filters, setFilters] = useState({
+  search: '',
+  category: 'all',
+  sort: 'newest',
+  page: 1,
+});
   const [products, setProducts] = useState([]);
   const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(true);
   const [pagination, setPagination] = useState({});
-  
-  const [filters, setFilters] = useState({
-    search: searchParams.get('search') || '',
-    category: searchParams.get('category') || 'all',
-    sort: searchParams.get('sort') || 'newest',
-    page: parseInt(searchParams.get('page')) || 1,
-  });
 
   const { addToCart } = useCart();
 
