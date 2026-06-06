@@ -1,0 +1,145 @@
+// scripts/migrate-products-categories.js
+// Run ONCE to migrate existing products to the new 5-category structure
+// node scripts/migrate-products-categories.js
+
+/**
+ * How it works:
+ * 1. Reads all products from Firestore
+ * 2. Maps old categorySlug → new categorySlug using SLUG_MAP
+ * 3. Updates each product's `category`, `categorySlug`, and sets `subcategory: ""`
+ *    if subcategory doesn't exist yet
+ * 4. Does NOT delete or change any other product field
+ */
+
+const { initializeApp, cert } = require('firebase-admin/app');
+const { getFirestore } = require('firebase-admin/firestore');
+
+// ── Config ────────────────────────────────────────────────────────────────────
+// Replace with your service account or use GOOGLE_APPLICATION_CREDENTIALS env
+const serviceAccount = require('./serviceAccountKey.json'); // adjust path
+
+initializeApp({ credential: cert(serviceAccount) });
+const db = getFirestore();
+
+// ── Category map ──────────────────────────────────────────────────────────────
+const NEW_CATEGORIES = {
+  electrical: { name: "Electrical", slug: "electrical" },
+  mechanical:  { name: "Mechanical",  slug: "mechanical"  },
+  pneumatic:   { name: "Pneumatic",   slug: "pneumatic"   },
+  bearing:     { name: "Bearing",     slug: "bearing"     },
+  general:     { name: "General",     slug: "general"     },
+};
+
+// Map old slugs → new slug. Add more entries as needed.
+const SLUG_MAP = {
+  // bearing variants
+  "bearings":             "bearing",
+  "bearing":              "bearing",
+  "ball-bearing":         "bearing",
+  "roller-bearing":       "bearing",
+  "pillow-block":         "bearing",
+
+  // pneumatic variants
+  "valves":               "pneumatic",
+  "valve":                "pneumatic",
+  "pneumatic":            "pneumatic",
+  "pneumatic-components": "pneumatic",
+  "fittings":             "pneumatic",
+  "air-preparation":      "pneumatic",
+
+  // mechanical variants
+  "gearbox":              "mechanical",
+  "gearboxes":            "mechanical",
+  "mechanical":           "mechanical",
+  "pumps":                "mechanical",
+  "pump":                 "mechanical",
+  "coupling":             "mechanical",
+  "couplings":            "mechanical",
+  "shaft":                "mechanical",
+
+  // electrical variants
+  "electrical":           "electrical",
+  "electrical-components":"electrical",
+  "motors":               "electrical",
+  "motor":                "electrical",
+  "cables":               "electrical",
+  "panel":                "electrical",
+
+  // general (catch-all)
+  "seals":                "general",
+  "seal":                 "general",
+  "fasteners":            "general",
+  "tools":                "general",
+  "general":              "general",
+  "others":               "general",
+};
+
+function resolveNewSlug(oldSlug, oldName) {
+  if (!oldSlug && !oldName) return "general";
+
+  const slug = (oldSlug || "").toLowerCase().trim();
+  const name = (oldName || "").toLowerCase().trim();
+
+  // Direct slug match
+  if (SLUG_MAP[slug]) return SLUG_MAP[slug];
+
+  // Try to match by name keywords
+  if (name.includes("bearing")) return "bearing";
+  if (name.includes("pneumat") || name.includes("valve") || name.includes("cylinder")) return "pneumatic";
+  if (name.includes("electr") || name.includes("motor") || name.includes("cable")) return "electrical";
+  if (name.includes("gear") || name.includes("pump") || name.includes("shaft") || name.includes("coupling")) return "mechanical";
+
+  // Fallback
+  console.log(`  ⚠️  Unknown category "${oldSlug}" / "${oldName}" → defaulting to "general"`);
+  return "general";
+}
+
+async function migrate() {
+  console.log("🚀 Starting category migration...\n");
+
+  const snapshot = await db.collection('products').get();
+  console.log(`Found ${snapshot.size} products.\n`);
+
+  let updated = 0;
+  let skipped = 0;
+  const batch = db.batch();
+
+  snapshot.forEach((docSnap) => {
+    const data = docSnap.data();
+    const oldSlug = data.categorySlug || "";
+    const oldName = data.category || "";
+
+    const newSlug = resolveNewSlug(oldSlug, oldName);
+    const newCat  = NEW_CATEGORIES[newSlug];
+
+    // Build update — preserve ALL other fields
+    const update = {
+      category:     newCat.name,
+      categorySlug: newCat.slug,
+    };
+
+    // Only set subcategory if it doesn't already exist
+    if (data.subcategory === undefined || data.subcategory === null) {
+      update.subcategory = "";
+    }
+
+    console.log(
+      `  [${docSnap.id}] "${oldName}" (${oldSlug}) → "${newCat.name}" (${newCat.slug})`
+    );
+
+    batch.update(docSnap.ref, update);
+    updated++;
+  });
+
+  await batch.commit();
+
+  console.log(`\n✅ Migration complete!`);
+  console.log(`   Updated : ${updated} products`);
+  console.log(`   Skipped : ${skipped} products`);
+  console.log(`\nAll existing product data (price, SKU, images, specs, etc.) preserved.`);
+}
+
+migrate().catch((err) => {
+  console.error("❌ Migration failed:", err);
+  process.exit(1);
+});
