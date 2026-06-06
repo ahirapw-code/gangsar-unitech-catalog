@@ -15,15 +15,24 @@ import { useAdmin } from '@/contexts/AdminContext';
 import { toast } from 'sonner';
 import ImageUploader from '@/components/ImageUploader';
 
+// ─── Master categories (static) ───────────────────────────────────────────────
+const MASTER_CATEGORIES = [
+  { id: 'cat-electrical', name: 'Electrical', slug: 'electrical' },
+  { id: 'cat-mechanical', name: 'Mechanical',  slug: 'mechanical'  },
+  { id: 'cat-pneumatic',  name: 'Pneumatic',   slug: 'pneumatic'   },
+  { id: 'cat-bearing',    name: 'Bearing',     slug: 'bearing'     },
+  { id: 'cat-general',    name: 'General',     slug: 'general'     },
+];
+
 export default function EditProductPage() {
   const router = useRouter();
   const params = useParams();
   const { admin, loading, getToken } = useAdmin();
-  const [categories, setCategories] = useState([]);
+
   const [loadingProduct, setLoadingProduct] = useState(true);
-  const [submitting, setSubmitting] = useState(false);
-  const [originalImages, setOriginalImages] = useState([]); // simpan gambar asli sebelum diedit
-  
+  const [submitting, setSubmitting]         = useState(false);
+  const [originalImages, setOriginalImages] = useState([]);
+  const [subcategorySuggestions, setSubcategorySuggestions] = useState({});
   const [formData, setFormData] = useState(null);
 
   useEffect(() => {
@@ -31,33 +40,55 @@ export default function EditProductPage() {
       router.push('/admin/login');
     } else if (admin && params.id) {
       fetchData();
+      fetchSubcategorySuggestions();
     }
   }, [admin, loading, params.id, router]);
 
+  async function fetchSubcategorySuggestions() {
+    try {
+      const res = await fetch('/api/categories?withSubcategories=true');
+      if (!res.ok) return;
+      const data = await res.json();
+      const map = {};
+      data.forEach((cat) => {
+        if (cat.subcategories?.length) map[cat.slug] = cat.subcategories;
+      });
+      setSubcategorySuggestions(map);
+    } catch (_) {}
+  }
+
   async function fetchData() {
     try {
-      const [categoriesRes, productsRes] = await Promise.all([
-        fetch('/api/categories'),
-        fetch('/api/products?limit=200')
-      ]);
-      
-      const categoriesData = await categoriesRes.json();
+      const productsRes = await fetch('/api/products?limit=200');
       const productsData = await productsRes.json();
-      
-      setCategories(categoriesData || []);
-      
-      const product = productsData.products?.find(p => p.id === params.id);
+
+      const product = productsData.products?.find((p) => p.id === params.id);
       if (product) {
         const images = product.images || [''];
-        setOriginalImages(images); // simpan gambar asli untuk perbandingan nanti
+        setOriginalImages(images);
+
+        // Ensure category name matches MASTER_CATEGORIES
+        // (handles products migrated from old category names)
+        const matchedCat =
+          MASTER_CATEGORIES.find(
+            (c) =>
+              c.slug === product.categorySlug ||
+              c.name.toLowerCase() === (product.category || '').toLowerCase()
+          ) || null;
+
         setFormData({
           ...product,
-          price: product.price.toString(),
-          originalPrice: product.originalPrice?.toString() || product.price.toString(),
-          images: images,
-          specifications: product.specifications && product.specifications.length > 0 
-            ? product.specifications 
-            : [{ label: '', value: '' }]
+          category:     matchedCat?.name     || product.category     || '',
+          categorySlug: matchedCat?.slug     || product.categorySlug || '',
+          subcategory:  product.subcategory  || '',
+          price:        product.price.toString(),
+          originalPrice:
+            product.originalPrice?.toString() || product.price.toString(),
+          images,
+          specifications:
+            product.specifications?.length > 0
+              ? product.specifications
+              : [{ label: '', value: '' }],
         });
       } else {
         toast.error('Product not found');
@@ -72,20 +103,20 @@ export default function EditProductPage() {
   }
 
   const handleCategoryChange = (categoryName) => {
-    const category = categories.find(c => c.name === categoryName);
+    const category = MASTER_CATEGORIES.find((c) => c.name === categoryName);
     setFormData({
       ...formData,
-      category: categoryName,
-      categorySlug: category?.slug || ''
+      category:     categoryName,
+      categorySlug: category?.slug || '',
+      subcategory:  '', // reset subcategory when category changes
     });
   };
 
-  const addSpecification = () => {
+  const addSpecification = () =>
     setFormData({
       ...formData,
-      specifications: [...formData.specifications, { label: '', value: '' }]
+      specifications: [...formData.specifications, { label: '', value: '' }],
     });
-  };
 
   const updateSpecification = (index, field, value) => {
     const newSpecs = [...formData.specifications];
@@ -95,35 +126,31 @@ export default function EditProductPage() {
 
   const removeSpecification = (index) => {
     const newSpecs = formData.specifications.filter((_, i) => i !== index);
-    setFormData({ ...formData, specifications: newSpecs.length > 0 ? newSpecs : [{ label: '', value: '' }] });
+    setFormData({
+      ...formData,
+      specifications: newSpecs.length > 0 ? newSpecs : [{ label: '', value: '' }],
+    });
   };
 
-  // Cari gambar yang dihapus (ada di originalImages tapi tidak ada di formData.images saat ini)
-  const getDeletedImages = (newImages) => {
-    return originalImages.filter(
-      oldImg => oldImg && oldImg.trim() !== '' && !newImages.includes(oldImg)
+  const getDeletedImages = (newImages) =>
+    originalImages.filter(
+      (old) => old && old.trim() !== '' && !newImages.includes(old)
     );
-  };
 
-  // Hapus gambar dari Vercel Blob storage
   const deleteImagesFromServer = async (imagesToDelete) => {
-    if (!imagesToDelete || imagesToDelete.length === 0) return;
-
-    const deletePromises = imagesToDelete
-      // Hanya hapus gambar yang memang tersimpan di Vercel Blob (bukan URL eksternal)
-      .filter(imageUrl => imageUrl && imageUrl.includes('blob.vercel-storage.com'))
-      .map(imageUrl =>
+    if (!imagesToDelete?.length) return;
+    const promises = imagesToDelete
+      .filter((url) => url?.includes('blob.vercel-storage.com'))
+      .map((url) =>
         fetch('/api/upload', {
           method: 'DELETE',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ imageUrl })
-        }).catch(err => {
-          // Jangan hentikan proses update produk jika delete gagal
-          console.warn('Failed to delete image from Vercel Blob:', imageUrl, err);
-        })
+          body: JSON.stringify({ imageUrl: url }),
+        }).catch((err) =>
+          console.warn('Failed to delete image:', url, err)
+        )
       );
-
-    await Promise.allSettled(deletePromises);
+    await Promise.allSettled(promises);
   };
 
   const handleSubmit = async (e) => {
@@ -131,38 +158,44 @@ export default function EditProductPage() {
     setSubmitting(true);
 
     const token = getToken();
-    
-    const filteredImages = formData.images.filter(img => img && img.trim() !== '');
-    
-    // Cari dan hapus gambar yang sudah diganti/dihapus user
-    const deletedImages = getDeletedImages(filteredImages);
-    if (deletedImages.length > 0) {
-      await deleteImagesFromServer(deletedImages);
-    }
+    const filteredImages = formData.images.filter(
+      (img) => img && img.trim() !== ''
+    );
 
-    // Calculate discount if promo
+    const deletedImages = getDeletedImages(filteredImages);
+    if (deletedImages.length > 0) await deleteImagesFromServer(deletedImages);
+
     let discount = 0;
     if (formData.isPromo && formData.originalPrice && formData.price) {
-      discount = Math.round(((parseFloat(formData.originalPrice) - parseFloat(formData.price)) / parseFloat(formData.originalPrice)) * 100);
+      discount = Math.round(
+        ((parseFloat(formData.originalPrice) - parseFloat(formData.price)) /
+          parseFloat(formData.originalPrice)) *
+          100
+      );
     }
 
     const productData = {
       ...formData,
       price: parseFloat(formData.price),
-      originalPrice: formData.isPromo ? parseFloat(formData.originalPrice || formData.price) : parseFloat(formData.price),
-      discount: formData.isPromo ? discount : 0,
-      images: filteredImages,
-      specifications: formData.specifications.filter(spec => spec.label && spec.value)
+      originalPrice: formData.isPromo
+        ? parseFloat(formData.originalPrice || formData.price)
+        : parseFloat(formData.price),
+      discount:     formData.isPromo ? discount : 0,
+      subcategory:  formData.subcategory?.trim() || '',
+      images:       filteredImages,
+      specifications: formData.specifications.filter(
+        (spec) => spec.label && spec.value
+      ),
     };
 
     try {
       const res = await fetch(`/api/products/${params.id}`, {
         method: 'PUT',
         headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
         },
-        body: JSON.stringify(productData)
+        body: JSON.stringify(productData),
       });
 
       if (res.ok) {
@@ -190,8 +223,12 @@ export default function EditProductPage() {
     );
   }
 
+  const currentSuggestions =
+    subcategorySuggestions[formData.categorySlug] || [];
+
   return (
     <div className="min-h-screen bg-gray-50">
+      {/* Header */}
       <div className="bg-white border-b">
         <div className="container mx-auto px-4 py-4">
           <div className="flex items-center gap-4">
@@ -212,23 +249,27 @@ export default function EditProductPage() {
       <div className="container mx-auto px-4 py-8">
         <form onSubmit={handleSubmit}>
           <div className="grid lg:grid-cols-3 gap-6">
-            {/* Main Info */}
+            {/* ── Main Info ───────────────────────────────────────────────── */}
             <div className="lg:col-span-2 space-y-6">
               <Card>
                 <CardHeader>
                   <CardTitle>Basic Information</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
+                  {/* Name */}
                   <div>
                     <Label htmlFor="name">Product Name *</Label>
                     <Input
                       id="name"
                       required
                       value={formData.name}
-                      onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                      onChange={(e) =>
+                        setFormData({ ...formData, name: e.target.value })
+                      }
                     />
                   </div>
 
+                  {/* SKU + Category */}
                   <div className="grid md:grid-cols-2 gap-4">
                     <div>
                       <Label htmlFor="sku">SKU Code *</Label>
@@ -236,17 +277,26 @@ export default function EditProductPage() {
                         id="sku"
                         required
                         value={formData.sku}
-                        onChange={(e) => setFormData({ ...formData, sku: e.target.value.toUpperCase() })}
+                        onChange={(e) =>
+                          setFormData({
+                            ...formData,
+                            sku: e.target.value.toUpperCase(),
+                          })
+                        }
                       />
                     </div>
                     <div>
                       <Label htmlFor="category">Category *</Label>
-                      <Select value={formData.category} onValueChange={handleCategoryChange} required>
+                      <Select
+                        value={formData.category}
+                        onValueChange={handleCategoryChange}
+                        required
+                      >
                         <SelectTrigger>
                           <SelectValue placeholder="Select category" />
                         </SelectTrigger>
                         <SelectContent>
-                          {categories.map((cat) => (
+                          {MASTER_CATEGORIES.map((cat) => (
                             <SelectItem key={cat.id} value={cat.name}>
                               {cat.name}
                             </SelectItem>
@@ -256,20 +306,69 @@ export default function EditProductPage() {
                     </div>
                   </div>
 
+                  {/* Subcategory */}
+                  <div>
+                    <Label htmlFor="subcategory">
+                      Sub Category
+                      <span className="ml-1 text-xs text-gray-400 font-normal">
+                        (optional — e.g., Ball Bearing, MCB, Solenoid Valve)
+                      </span>
+                    </Label>
+                    <Input
+                      id="subcategory"
+                      value={formData.subcategory}
+                      onChange={(e) =>
+                        setFormData({ ...formData, subcategory: e.target.value })
+                      }
+                      placeholder="Enter sub category..."
+                      list="subcategory-suggestions"
+                    />
+                    {currentSuggestions.length > 0 && (
+                      <datalist id="subcategory-suggestions">
+                        {currentSuggestions.map((s) => (
+                          <option key={s} value={s} />
+                        ))}
+                      </datalist>
+                    )}
+                    {/* Clickable suggestion chips */}
+                    {currentSuggestions.length > 0 && (
+                      <div className="mt-2 flex flex-wrap gap-1">
+                        <span className="text-xs text-gray-400 mr-1 self-center">
+                          Existing:
+                        </span>
+                        {currentSuggestions.slice(0, 8).map((s) => (
+                          <button
+                            key={s}
+                            type="button"
+                            onClick={() =>
+                              setFormData({ ...formData, subcategory: s })
+                            }
+                            className="text-xs px-2 py-0.5 rounded-full bg-gray-100 hover:bg-[#1E8E5A] hover:text-white transition-colors border border-gray-200"
+                          >
+                            {s}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Description */}
                   <div>
                     <Label htmlFor="description">Description *</Label>
                     <Textarea
                       id="description"
                       required
                       value={formData.description}
-                      onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                      onChange={(e) =>
+                        setFormData({ ...formData, description: e.target.value })
+                      }
                       rows={4}
                     />
                   </div>
                 </CardContent>
               </Card>
 
-              {/* Pricing */}
+              {/* ── Pricing ────────────────────────────────────────────────── */}
               <Card>
                 <CardHeader>
                   <CardTitle>Pricing</CardTitle>
@@ -283,7 +382,9 @@ export default function EditProductPage() {
                         type="number"
                         required
                         value={formData.price}
-                        onChange={(e) => setFormData({ ...formData, price: e.target.value })}
+                        onChange={(e) =>
+                          setFormData({ ...formData, price: e.target.value })
+                        }
                       />
                     </div>
                     {formData.isPromo && (
@@ -294,7 +395,12 @@ export default function EditProductPage() {
                           type="number"
                           required={formData.isPromo}
                           value={formData.originalPrice}
-                          onChange={(e) => setFormData({ ...formData, originalPrice: e.target.value })}
+                          onChange={(e) =>
+                            setFormData({
+                              ...formData,
+                              originalPrice: e.target.value,
+                            })
+                          }
                         />
                       </div>
                     )}
@@ -302,23 +408,34 @@ export default function EditProductPage() {
 
                   <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
                     <div>
-                      <Label htmlFor="isPromo" className="font-semibold">Promotional Item</Label>
-                      <p className="text-sm text-gray-600">Display this product with a discount badge</p>
+                      <Label htmlFor="isPromo" className="font-semibold">
+                        Promotional Item
+                      </Label>
+                      <p className="text-sm text-gray-600">
+                        Display this product with a discount badge
+                      </p>
                     </div>
                     <Switch
                       id="isPromo"
                       checked={formData.isPromo}
-                      onCheckedChange={(checked) => setFormData({ ...formData, isPromo: checked })}
+                      onCheckedChange={(checked) =>
+                        setFormData({ ...formData, isPromo: checked })
+                      }
                     />
                   </div>
                 </CardContent>
               </Card>
 
-              {/* Specifications */}
+              {/* ── Specifications ─────────────────────────────────────────── */}
               <Card>
                 <CardHeader className="flex flex-row items-center justify-between">
                   <CardTitle>Specifications</CardTitle>
-                  <Button type="button" size="sm" variant="outline" onClick={addSpecification}>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    onClick={addSpecification}
+                  >
                     <Plus className="h-4 w-4 mr-1" />
                     Add Spec
                   </Button>
@@ -329,13 +446,17 @@ export default function EditProductPage() {
                       <Input
                         placeholder="Label"
                         value={spec.label}
-                        onChange={(e) => updateSpecification(index, 'label', e.target.value)}
+                        onChange={(e) =>
+                          updateSpecification(index, 'label', e.target.value)
+                        }
                         className="flex-1"
                       />
                       <Input
                         placeholder="Value"
                         value={spec.value}
-                        onChange={(e) => updateSpecification(index, 'value', e.target.value)}
+                        onChange={(e) =>
+                          updateSpecification(index, 'value', e.target.value)
+                        }
                         className="flex-1"
                       />
                       {formData.specifications.length > 1 && (
@@ -353,7 +474,7 @@ export default function EditProductPage() {
                 </CardContent>
               </Card>
 
-              {/* Images — sekarang pakai ImageUploader sama seperti Add Product */}
+              {/* ── Images ─────────────────────────────────────────────────── */}
               <Card>
                 <CardHeader>
                   <CardTitle>Product Images</CardTitle>
@@ -361,13 +482,15 @@ export default function EditProductPage() {
                 <CardContent>
                   <ImageUploader
                     images={formData.images}
-                    onImagesChange={(newImages) => setFormData({ ...formData, images: newImages })}
+                    onImagesChange={(newImages) =>
+                      setFormData({ ...formData, images: newImages })
+                    }
                   />
                 </CardContent>
               </Card>
             </div>
 
-            {/* Sidebar */}
+            {/* ── Sidebar ─────────────────────────────────────────────────── */}
             <div className="space-y-6">
               <Card>
                 <CardHeader>
@@ -379,7 +502,9 @@ export default function EditProductPage() {
                     <Switch
                       id="inStock"
                       checked={formData.inStock}
-                      onCheckedChange={(checked) => setFormData({ ...formData, inStock: checked })}
+                      onCheckedChange={(checked) =>
+                        setFormData({ ...formData, inStock: checked })
+                      }
                     />
                   </div>
                   <div className="flex items-center justify-between">
@@ -387,7 +512,9 @@ export default function EditProductPage() {
                     <Switch
                       id="featured"
                       checked={formData.featured}
-                      onCheckedChange={(checked) => setFormData({ ...formData, featured: checked })}
+                      onCheckedChange={(checked) =>
+                        setFormData({ ...formData, featured: checked })
+                      }
                     />
                   </div>
                 </CardContent>
