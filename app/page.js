@@ -9,8 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { useCart } from '@/contexts/CartContext';
 import { toast } from 'sonner';
-import ClientsSection from '@/components/ClientsSection';
-
+import ClientsSection from './components/ClientsSection';
 export default function HomePage() {
   const [promoProducts, setPromoProducts] = useState([]);
   const [categories, setCategories] = useState([]);
