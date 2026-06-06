@@ -1,451 +1,92 @@
+// app/api/categories/route.js
+// Replace your existing categories API with this file
+
 import { NextResponse } from 'next/server';
-import { getDb } from '@/lib/db';
-import { hashPassword, verifyPassword, initializeAdmin } from '@/lib/auth';
-import { sendEmail } from '@/lib/email';
-import { initializeData } from '@/lib/initData';
-import { v4 as uuidv4 } from 'uuid';
+import { db } from '@/lib/firebase'; // adjust import to your DB setup
+import { collection, getDocs, doc, setDoc, getDoc } from 'firebase/firestore';
 
-// Initialize admin and data on startup
-let initialized = false;
-async function initialize() {
-  if (!initialized) {
-    try {
-      await initializeAdmin();
-      await initializeData();
-      initialized = true;
-    } catch (error) {
-      console.error('Initialization error:', error);
-    }
-  }
-}
+// ─── Static category definitions ──────────────────────────────────────────────
+// These are the 5 master categories. Subcategories are stored per-product.
+export const MASTER_CATEGORIES = [
+  {
+    id: "cat-electrical",
+    name: "Electrical",
+    slug: "electrical",
+    image: "https://images.unsplash.com/photo-1555664424-778a1e5e1b48?w=400&q=80",
+    description: "Electrical components, cables, switches, and control panels",
+    order: 1,
+  },
+  {
+    id: "cat-mechanical",
+    name: "Mechanical",
+    slug: "mechanical",
+    image: "https://images.unsplash.com/photo-1581092918056-0c4c3acd3789?w=400&q=80",
+    description: "Gears, shafts, couplings, and mechanical transmission parts",
+    order: 2,
+  },
+  {
+    id: "cat-pneumatic",
+    name: "Pneumatic",
+    slug: "pneumatic",
+    image: "https://images.unsplash.com/photo-1504328345606-18bbc8c9d7d1?w=400&q=80",
+    description: "Pneumatic cylinders, valves, fittings, and air preparation units",
+    order: 3,
+  },
+  {
+    id: "cat-bearing",
+    name: "Bearing",
+    slug: "bearing",
+    image: "https://images.unsplash.com/photo-1587293852726-70cdb56c2866?w=400&q=80",
+    description: "Ball bearings, roller bearings, pillow blocks, and related parts",
+    order: 4,
+  },
+  {
+    id: "cat-general",
+    name: "General",
+    slug: "general",
+    image: "https://images.unsplash.com/photo-1516937941344-00b4e0337589?w=400&q=80",
+    description: "General industrial spareparts and miscellaneous components",
+    order: 5,
+  },
+];
 
-// Helper function to check auth
-function checkAuth(request) {
-  const authHeader = request.headers.get('authorization');
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    return null;
-  }
-  return authHeader.substring(7);
-}
-
-// GET Handler
+// GET /api/categories
+// Returns master categories; optionally includes subcategories derived from products
 export async function GET(request) {
-  await initialize();
-  
-  const { pathname, searchParams } = new URL(request.url);
-  const path = pathname.replace('/api/', '');
-
   try {
-    const db = await getDb();
+    const { searchParams } = new URL(request.url);
+    const withSubcategories = searchParams.get('withSubcategories') === 'true';
 
-    // Get all categories
-    if (path === 'categories') {
-      const categories = await db.collection('categories')
-        .find({}, { projection: { name: 1, slug: 1, image: 1, description: 1, id: 1 } })
-        .limit(50)
-        .toArray();
-      return NextResponse.json(categories);
+    if (!withSubcategories) {
+      // Simple: return master categories only
+      return NextResponse.json(MASTER_CATEGORIES);
     }
 
-    // Get all products with filters
-    if (path === 'products') {
-      const category = searchParams.get('category');
-      const search = searchParams.get('search');
-      const promo = searchParams.get('promo');
-      const sort = searchParams.get('sort') || 'newest';
-      const page = parseInt(searchParams.get('page')) || 1;
-      const limit = parseInt(searchParams.get('limit')) || 12;
+    // If requested, also collect unique subcategories per category from products
+    const productsSnap = await getDocs(collection(db, 'products'));
+    const subcatMap = {}; // { "electrical": Set(["MCB", "Contactor", ...]) }
 
-      let query = {};
-      
-      if (category && category !== 'all') {
-        query.categorySlug = category;
+    productsSnap.forEach((docSnap) => {
+      const p = docSnap.data();
+      const slug = p.categorySlug || p.category?.toLowerCase().replace(/\s+/g, '-');
+      const subcat = p.subcategory?.trim();
+      if (slug && subcat) {
+        if (!subcatMap[slug]) subcatMap[slug] = new Set();
+        subcatMap[slug].add(subcat);
       }
-      
-      if (search) {
-        query.$or = [
-          { name: { $regex: search, $options: 'i' } },
-          { sku: { $regex: search, $options: 'i' } },
-          { description: { $regex: search, $options: 'i' } }
-        ];
-      }
-      
-      if (promo === 'true') {
-        query.isPromo = true;
-      }
+    });
 
-      let sortQuery = {};
-      if (sort === 'newest') {
-        sortQuery.createdAt = -1;
-      } else if (sort === 'promo') {
-        sortQuery.isPromo = -1;
-      } else if (sort === 'price-low') {
-        sortQuery.price = 1;
-      } else if (sort === 'price-high') {
-        sortQuery.price = -1;
-      }
+    const result = MASTER_CATEGORIES.map((cat) => ({
+      ...cat,
+      subcategories: subcatMap[cat.slug]
+        ? Array.from(subcatMap[cat.slug]).sort()
+        : [],
+    }));
 
-      const skip = (page - 1) * limit;
-      
-      const products = await db.collection('products')
-        .find(query)
-        .sort(sortQuery)
-        .skip(skip)
-        .limit(limit)
-        .toArray();
-
-      const total = await db.collection('products').countDocuments(query);
-
-      return NextResponse.json({
-        products,
-        pagination: {
-          page,
-          limit,
-          total,
-          pages: Math.ceil(total / limit)
-        }
-      });
-    }
-
-    // Get single product by slug
-    if (path.startsWith('products/')) {
-      const slug = path.split('/')[1];
-      const product = await db.collection('products').findOne({ slug });
-      
-      if (!product) {
-        return NextResponse.json({ error: 'Product not found' }, { status: 404 });
-      }
-
-      // Get related products from same category
-      const relatedProducts = await db.collection('products')
-        .find({ 
-          categorySlug: product.categorySlug,
-          id: { $ne: product.id }
-        })
-        .limit(4)
-        .toArray();
-
-      return NextResponse.json({ ...product, relatedProducts });
-    }
-
-    // Get featured/promo products for homepage
-    if (path === 'products/featured') {
-      const featured = await db.collection('products')
-        .find({ featured: true })
-        .limit(8)
-        .toArray();
-      
-      return NextResponse.json(featured);
-    }
-
-    // Get promo products
-    if (path === 'products/promo') {
-      const promoProducts = await db.collection('products')
-        .find({ isPromo: true })
-        .limit(8)
-        .toArray();
-      
-      return NextResponse.json(promoProducts);
-    }
-
-    // Get all RFQs (admin only)
-    if (path === 'rfq') {
-      const token = checkAuth(request);
-      if (!token) {
-        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-      }
-
-      const rfqs = await db.collection('rfqs')
-        .find({})
-        .sort({ createdAt: -1 })
-        .limit(100)
-        .toArray();
-      
-      return NextResponse.json(rfqs);
-    }
-
-    // Dashboard stats (admin only)
-    if (path === 'admin/stats') {
-      const token = checkAuth(request);
-      if (!token) {
-        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-      }
-
-      const totalProducts = await db.collection('products').countDocuments();
-      const totalCategories = await db.collection('categories').countDocuments();
-      const totalRFQs = await db.collection('rfqs').countDocuments();
-      const pendingRFQs = await db.collection('rfqs').countDocuments({ status: 'pending' });
-
-      return NextResponse.json({
-        totalProducts,
-        totalCategories,
-        totalRFQs,
-        pendingRFQs
-      });
-    }
-
-    return NextResponse.json({ error: 'Not found' }, { status: 404 });
-
+    return NextResponse.json(result);
   } catch (error) {
-    console.error('GET Error:', error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
-  }
-}
-
-// POST Handler
-export async function POST(request) {
-  await initialize();
-  
-  const { pathname } = new URL(request.url);
-  const path = pathname.replace('/api/', '');
-
-  try {
-    const db = await getDb();
-    const body = await request.json();
-
-    // Admin login
-    if (path === 'auth/login') {
-      const { email, password } = body;
-      
-      const user = await db.collection('users').findOne({ email });
-      
-      if (!user) {
-        return NextResponse.json({ error: 'Invalid credentials' }, { status: 401 });
-      }
-
-      const isValid = await verifyPassword(password, user.password);
-      
-      if (!isValid) {
-        return NextResponse.json({ error: 'Invalid credentials' }, { status: 401 });
-      }
-
-      const token = Math.random().toString(36).substring(2) + Date.now().toString(36);
-      
-      await db.collection('sessions').insertOne({
-        userId: user.email,
-        token,
-        createdAt: new Date(),
-        expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000) // 7 days
-      });
-
-      return NextResponse.json({
-        token,
-        user: {
-          email: user.email,
-          role: user.role
-        }
-      });
-    }
-
-    // Create RFQ
-    if (path === 'rfq') {
-      const { fullName, companyName, phone, email, products, notes } = body;
-
-      const rfq = {
-        id: uuidv4(),
-        fullName,
-        companyName,
-        phone,
-        email,
-        products,
-        notes,
-        status: 'pending',
-        createdAt: new Date()
-      };
-
-      await db.collection('rfqs').insertOne(rfq);
-
-      // Send email notification
-      const productList = products.map(p => 
-        `<li><strong>${p.name}</strong> (SKU: ${p.sku}) - Quantity: ${p.quantity || 1}</li>`
-      ).join('');
-
-      const emailHtml = `
-        <h2>New Quotation Request</h2>
-        <p><strong>From:</strong> ${fullName}</p>
-        <p><strong>Company:</strong> ${companyName}</p>
-        <p><strong>Phone:</strong> ${phone}</p>
-        <p><strong>Email:</strong> ${email}</p>
-        <h3>Products Requested:</h3>
-        <ul>${productList}</ul>
-        <p><strong>Additional Notes:</strong></p>
-        <p>${notes || 'None'}</p>
-      `;
-
-      await sendEmail({
-        to: process.env.ADMIN_EMAIL || 'admin@gangsarunitech.com',
-        subject: `New RFQ from ${companyName}`,
-        html: emailHtml
-      });
-
-      return NextResponse.json({ success: true, rfq });
-    }
-
-    // Create product (admin only)
-    if (path === 'products') {
-      const token = checkAuth(request);
-      if (!token) {
-        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-      }
-
-      const product = {
-        id: uuidv4(),
-        ...body,
-        slug: body.name.toLowerCase().replace(/[^a-z0-9]+/g, '-'),
-        createdAt: new Date()
-      };
-
-      await db.collection('products').insertOne(product);
-      return NextResponse.json(product);
-    }
-
-    // Create category (admin only)
-    if (path === 'categories') {
-      const token = checkAuth(request);
-      if (!token) {
-        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-      }
-
-      const category = {
-        id: uuidv4(),
-        ...body,
-        slug: body.name.toLowerCase().replace(/[^a-z0-9]+/g, '-'),
-        createdAt: new Date()
-      };
-
-      await db.collection('categories').insertOne(category);
-      return NextResponse.json(category);
-    }
-
-    return NextResponse.json({ error: 'Not found' }, { status: 404 });
-
-  } catch (error) {
-    console.error('POST Error:', error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
-  }
-}
-
-// PUT Handler
-export async function PUT(request) {
-  await initialize();
-  
-  const { pathname } = new URL(request.url);
-  const path = pathname.replace('/api/', '');
-
-  try {
-    const token = checkAuth(request);
-    if (!token) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
-    const db = await getDb();
-    const body = await request.json();
-
-    // Update product
-    if (path.startsWith('products/')) {
-      const id = path.split('/')[1];
-      
-      const { id: _, _id, ...updateData } = body;
-      
-      const result = await db.collection('products').updateOne(
-        { id },
-        { $set: { ...updateData, updatedAt: new Date() } }
-      );
-
-      if (result.matchedCount === 0) {
-        return NextResponse.json({ error: 'Product not found' }, { status: 404 });
-      }
-
-      return NextResponse.json({ success: true });
-    }
-
-    // Update RFQ status
-    if (path.startsWith('rfq/')) {
-      const id = path.split('/')[1];
-      
-      const result = await db.collection('rfqs').updateOne(
-        { id },
-        { $set: { status: body.status, updatedAt: new Date() } }
-      );
-
-      if (result.matchedCount === 0) {
-        return NextResponse.json({ error: 'RFQ not found' }, { status: 404 });
-      }
-
-      return NextResponse.json({ success: true });
-    }
-
-    // Update category
-    if (path.startsWith('categories/')) {
-      const id = path.split('/')[1];
-      
-      const { id: _, _id, ...updateData } = body;
-      
-      const result = await db.collection('categories').updateOne(
-        { id },
-        { $set: { ...updateData, updatedAt: new Date() } }
-      );
-
-      if (result.matchedCount === 0) {
-        return NextResponse.json({ error: 'Category not found' }, { status: 404 });
-      }
-
-      return NextResponse.json({ success: true });
-    }
-
-    return NextResponse.json({ error: 'Not found' }, { status: 404 });
-
-  } catch (error) {
-    console.error('PUT Error:', error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
-  }
-}
-
-// DELETE Handler
-export async function DELETE(request) {
-  await initialize();
-  
-  const { pathname } = new URL(request.url);
-  const path = pathname.replace('/api/', '');
-
-  try {
-    const token = checkAuth(request);
-    if (!token) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
-    const db = await getDb();
-
-    // Delete product
-    if (path.startsWith('products/')) {
-      const id = path.split('/')[1];
-      
-      const result = await db.collection('products').deleteOne({ id });
-
-      if (result.deletedCount === 0) {
-        return NextResponse.json({ error: 'Product not found' }, { status: 404 });
-      }
-
-      return NextResponse.json({ success: true });
-    }
-
-    // Delete category
-    if (path.startsWith('categories/')) {
-      const id = path.split('/')[1];
-      
-      const result = await db.collection('categories').deleteOne({ id });
-
-      if (result.deletedCount === 0) {
-        return NextResponse.json({ error: 'Category not found' }, { status: 404 });
-      }
-
-      return NextResponse.json({ success: true });
-    }
-
-    return NextResponse.json({ error: 'Not found' }, { status: 404 });
-
-  } catch (error) {
-    console.error('DELETE Error:', error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    console.error('Error fetching categories:', error);
+    // Fallback: return static categories even if DB fails
+    return NextResponse.json(MASTER_CATEGORIES);
   }
 }
