@@ -15,17 +15,29 @@ import { useAdmin } from '@/contexts/AdminContext';
 import { toast } from 'sonner';
 import ImageUploader from '@/components/ImageUploader';
 
+// ─── Master categories (static, no DB call needed) ────────────────────────────
+const MASTER_CATEGORIES = [
+  { id: 'cat-electrical', name: 'Electrical', slug: 'electrical' },
+  { id: 'cat-mechanical', name: 'Mechanical',  slug: 'mechanical'  },
+  { id: 'cat-pneumatic',  name: 'Pneumatic',   slug: 'pneumatic'   },
+  { id: 'cat-bearing',    name: 'Bearing',     slug: 'bearing'     },
+  { id: 'cat-general',    name: 'General',     slug: 'general'     },
+];
+
 export default function AddProductPage() {
   const router = useRouter();
   const { admin, loading, getToken } = useAdmin();
-  const [categories, setCategories] = useState([]);
   const [submitting, setSubmitting] = useState(false);
-  
+
+  // Track existing subcategories per category for autocomplete suggestions
+  const [subcategorySuggestions, setSubcategorySuggestions] = useState({});
+
   const [formData, setFormData] = useState({
     name: '',
     sku: '',
     category: '',
     categorySlug: '',
+    subcategory: '',          // ← new field
     description: '',
     price: '',
     originalPrice: '',
@@ -34,42 +46,47 @@ export default function AddProductPage() {
     inStock: true,
     featured: false,
     images: [''],
-    specifications: [{ label: '', value: '' }]
+    specifications: [{ label: '', value: '' }],
   });
 
   useEffect(() => {
     if (!loading && !admin) {
       router.push('/admin/login');
     } else if (admin) {
-      fetchCategories();
+      fetchSubcategorySuggestions();
     }
   }, [admin, loading, router]);
 
-  async function fetchCategories() {
+  // Load existing subcategories from products for autocomplete hints
+  async function fetchSubcategorySuggestions() {
     try {
-      const res = await fetch('/api/categories');
+      const res = await fetch('/api/categories?withSubcategories=true');
+      if (!res.ok) return;
       const data = await res.json();
-      setCategories(data || []);
-    } catch (error) {
-      console.error('Error fetching categories:', error);
+      const map = {};
+      data.forEach((cat) => {
+        if (cat.subcategories?.length) {
+          map[cat.slug] = cat.subcategories;
+        }
+      });
+      setSubcategorySuggestions(map);
+    } catch (err) {
+      // non-critical, ignore
     }
   }
 
   const handleCategoryChange = (categoryName) => {
-    const category = categories.find(c => c.name === categoryName);
+    const category = MASTER_CATEGORIES.find((c) => c.name === categoryName);
     setFormData({
       ...formData,
       category: categoryName,
-      categorySlug: category?.slug || ''
+      categorySlug: category?.slug || '',
+      subcategory: '', // reset subcategory when category changes
     });
   };
 
-  const addImage = () => {
-    setFormData({
-      ...formData,
-      images: [...formData.images, '']
-    });
-  };
+  const addImage = () =>
+    setFormData({ ...formData, images: [...formData.images, ''] });
 
   const updateImage = (index, value) => {
     const newImages = [...formData.images];
@@ -82,12 +99,11 @@ export default function AddProductPage() {
     setFormData({ ...formData, images: newImages.length > 0 ? newImages : [''] });
   };
 
-  const addSpecification = () => {
+  const addSpecification = () =>
     setFormData({
       ...formData,
-      specifications: [...formData.specifications, { label: '', value: '' }]
+      specifications: [...formData.specifications, { label: '', value: '' }],
     });
-  };
 
   const updateSpecification = (index, field, value) => {
     const newSpecs = [...formData.specifications];
@@ -97,7 +113,10 @@ export default function AddProductPage() {
 
   const removeSpecification = (index) => {
     const newSpecs = formData.specifications.filter((_, i) => i !== index);
-    setFormData({ ...formData, specifications: newSpecs.length > 0 ? newSpecs : [{ label: '', value: '' }] });
+    setFormData({
+      ...formData,
+      specifications: newSpecs.length > 0 ? newSpecs : [{ label: '', value: '' }],
+    });
   };
 
   const handleSubmit = async (e) => {
@@ -105,30 +124,38 @@ export default function AddProductPage() {
     setSubmitting(true);
 
     const token = getToken();
-    
-    // Calculate discount if promo
+
     let discount = 0;
     if (formData.isPromo && formData.originalPrice && formData.price) {
-      discount = Math.round(((parseFloat(formData.originalPrice) - parseFloat(formData.price)) / parseFloat(formData.originalPrice)) * 100);
+      discount = Math.round(
+        ((parseFloat(formData.originalPrice) - parseFloat(formData.price)) /
+          parseFloat(formData.originalPrice)) *
+          100
+      );
     }
 
     const productData = {
       ...formData,
       price: parseFloat(formData.price),
-      originalPrice: formData.isPromo ? parseFloat(formData.originalPrice || formData.price) : parseFloat(formData.price),
+      originalPrice: formData.isPromo
+        ? parseFloat(formData.originalPrice || formData.price)
+        : parseFloat(formData.price),
       discount: formData.isPromo ? discount : 0,
-      images: formData.images.filter(img => img.trim() !== ''),
-      specifications: formData.specifications.filter(spec => spec.label && spec.value)
+      subcategory: formData.subcategory?.trim() || '',
+      images: formData.images.filter((img) => img.trim() !== ''),
+      specifications: formData.specifications.filter(
+        (spec) => spec.label && spec.value
+      ),
     };
 
     try {
       const res = await fetch('/api/products', {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
         },
-        body: JSON.stringify(productData)
+        body: JSON.stringify(productData),
       });
 
       if (res.ok) {
@@ -148,13 +175,18 @@ export default function AddProductPage() {
   if (loading || !admin) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#1E8E5A]"></div>
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#1E8E5A]" />
       </div>
     );
   }
 
+  // Suggestions for the currently selected category
+  const currentSuggestions =
+    subcategorySuggestions[formData.categorySlug] || [];
+
   return (
     <div className="min-h-screen bg-gray-50">
+      {/* Header */}
       <div className="bg-white border-b">
         <div className="container mx-auto px-4 py-4">
           <div className="flex items-center gap-4">
@@ -175,24 +207,28 @@ export default function AddProductPage() {
       <div className="container mx-auto px-4 py-8">
         <form onSubmit={handleSubmit}>
           <div className="grid lg:grid-cols-3 gap-6">
-            {/* Main Info */}
+            {/* ── Main Info ───────────────────────────────────────────────── */}
             <div className="lg:col-span-2 space-y-6">
               <Card>
                 <CardHeader>
                   <CardTitle>Basic Information</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
+                  {/* Name */}
                   <div>
                     <Label htmlFor="name">Product Name *</Label>
                     <Input
                       id="name"
                       required
                       value={formData.name}
-                      onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                      onChange={(e) =>
+                        setFormData({ ...formData, name: e.target.value })
+                      }
                       placeholder="e.g., Deep Groove Ball Bearing 6205-2RS"
                     />
                   </div>
 
+                  {/* SKU + Category */}
                   <div className="grid md:grid-cols-2 gap-4">
                     <div>
                       <Label htmlFor="sku">SKU Code *</Label>
@@ -200,18 +236,27 @@ export default function AddProductPage() {
                         id="sku"
                         required
                         value={formData.sku}
-                        onChange={(e) => setFormData({ ...formData, sku: e.target.value.toUpperCase() })}
+                        onChange={(e) =>
+                          setFormData({
+                            ...formData,
+                            sku: e.target.value.toUpperCase(),
+                          })
+                        }
                         placeholder="e.g., BRG-6205-2RS"
                       />
                     </div>
                     <div>
                       <Label htmlFor="category">Category *</Label>
-                      <Select value={formData.category} onValueChange={handleCategoryChange} required>
+                      <Select
+                        value={formData.category}
+                        onValueChange={handleCategoryChange}
+                        required
+                      >
                         <SelectTrigger>
                           <SelectValue placeholder="Select category" />
                         </SelectTrigger>
                         <SelectContent>
-                          {categories.map((cat) => (
+                          {MASTER_CATEGORIES.map((cat) => (
                             <SelectItem key={cat.id} value={cat.name}>
                               {cat.name}
                             </SelectItem>
@@ -221,13 +266,63 @@ export default function AddProductPage() {
                     </div>
                   </div>
 
+                  {/* Subcategory */}
+                  <div>
+                    <Label htmlFor="subcategory">
+                      Sub Category
+                      <span className="ml-1 text-xs text-gray-400 font-normal">
+                        (optional — e.g., Ball Bearing, MCB, Solenoid Valve)
+                      </span>
+                    </Label>
+                    <Input
+                      id="subcategory"
+                      value={formData.subcategory}
+                      onChange={(e) =>
+                        setFormData({ ...formData, subcategory: e.target.value })
+                      }
+                      placeholder="Enter sub category..."
+                      list="subcategory-suggestions"
+                    />
+                    {/* Datalist for autocomplete based on existing subcategories */}
+                    {currentSuggestions.length > 0 && (
+                      <datalist id="subcategory-suggestions">
+                        {currentSuggestions.map((s) => (
+                          <option key={s} value={s} />
+                        ))}
+                      </datalist>
+                    )}
+                    {/* Show existing suggestions as clickable chips */}
+                    {currentSuggestions.length > 0 && (
+                      <div className="mt-2 flex flex-wrap gap-1">
+                        <span className="text-xs text-gray-400 mr-1 self-center">
+                          Existing:
+                        </span>
+                        {currentSuggestions.slice(0, 8).map((s) => (
+                          <button
+                            key={s}
+                            type="button"
+                            onClick={() =>
+                              setFormData({ ...formData, subcategory: s })
+                            }
+                            className="text-xs px-2 py-0.5 rounded-full bg-gray-100 hover:bg-[#1E8E5A] hover:text-white transition-colors border border-gray-200"
+                          >
+                            {s}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Description */}
                   <div>
                     <Label htmlFor="description">Description *</Label>
                     <Textarea
                       id="description"
                       required
                       value={formData.description}
-                      onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                      onChange={(e) =>
+                        setFormData({ ...formData, description: e.target.value })
+                      }
                       placeholder="Detailed product description..."
                       rows={4}
                     />
@@ -235,7 +330,7 @@ export default function AddProductPage() {
                 </CardContent>
               </Card>
 
-              {/* Pricing */}
+              {/* ── Pricing ────────────────────────────────────────────────── */}
               <Card>
                 <CardHeader>
                   <CardTitle>Pricing</CardTitle>
@@ -249,7 +344,9 @@ export default function AddProductPage() {
                         type="number"
                         required
                         value={formData.price}
-                        onChange={(e) => setFormData({ ...formData, price: e.target.value })}
+                        onChange={(e) =>
+                          setFormData({ ...formData, price: e.target.value })
+                        }
                         placeholder="e.g., 45000"
                       />
                     </div>
@@ -261,7 +358,12 @@ export default function AddProductPage() {
                           type="number"
                           required={formData.isPromo}
                           value={formData.originalPrice}
-                          onChange={(e) => setFormData({ ...formData, originalPrice: e.target.value })}
+                          onChange={(e) =>
+                            setFormData({
+                              ...formData,
+                              originalPrice: e.target.value,
+                            })
+                          }
                           placeholder="e.g., 60000"
                         />
                       </div>
@@ -270,23 +372,34 @@ export default function AddProductPage() {
 
                   <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
                     <div>
-                      <Label htmlFor="isPromo" className="font-semibold">Promotional Item</Label>
-                      <p className="text-sm text-gray-600">Display this product with a discount badge</p>
+                      <Label htmlFor="isPromo" className="font-semibold">
+                        Promotional Item
+                      </Label>
+                      <p className="text-sm text-gray-600">
+                        Display this product with a discount badge
+                      </p>
                     </div>
                     <Switch
                       id="isPromo"
                       checked={formData.isPromo}
-                      onCheckedChange={(checked) => setFormData({ ...formData, isPromo: checked })}
+                      onCheckedChange={(checked) =>
+                        setFormData({ ...formData, isPromo: checked })
+                      }
                     />
                   </div>
                 </CardContent>
               </Card>
 
-              {/* Specifications */}
+              {/* ── Specifications ─────────────────────────────────────────── */}
               <Card>
                 <CardHeader className="flex flex-row items-center justify-between">
                   <CardTitle>Specifications</CardTitle>
-                  <Button type="button" size="sm" variant="outline" onClick={addSpecification}>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    onClick={addSpecification}
+                  >
                     <Plus className="h-4 w-4 mr-1" />
                     Add Spec
                   </Button>
@@ -297,13 +410,17 @@ export default function AddProductPage() {
                       <Input
                         placeholder="Label (e.g., Material)"
                         value={spec.label}
-                        onChange={(e) => updateSpecification(index, 'label', e.target.value)}
+                        onChange={(e) =>
+                          updateSpecification(index, 'label', e.target.value)
+                        }
                         className="flex-1"
                       />
                       <Input
                         placeholder="Value (e.g., Stainless Steel)"
                         value={spec.value}
-                        onChange={(e) => updateSpecification(index, 'value', e.target.value)}
+                        onChange={(e) =>
+                          updateSpecification(index, 'value', e.target.value)
+                        }
                         className="flex-1"
                       />
                       {formData.specifications.length > 1 && (
@@ -321,21 +438,23 @@ export default function AddProductPage() {
                 </CardContent>
               </Card>
 
-              {/* Images */}
+              {/* ── Images ─────────────────────────────────────────────────── */}
               <Card>
                 <CardHeader>
                   <CardTitle>Product Images</CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <ImageUploader 
+                  <ImageUploader
                     images={formData.images}
-                    onImagesChange={(newImages) => setFormData({ ...formData, images: newImages })}
+                    onImagesChange={(newImages) =>
+                      setFormData({ ...formData, images: newImages })
+                    }
                   />
                 </CardContent>
               </Card>
             </div>
 
-            {/* Sidebar */}
+            {/* ── Sidebar ─────────────────────────────────────────────────── */}
             <div className="space-y-6">
               <Card>
                 <CardHeader>
@@ -347,7 +466,9 @@ export default function AddProductPage() {
                     <Switch
                       id="inStock"
                       checked={formData.inStock}
-                      onCheckedChange={(checked) => setFormData({ ...formData, inStock: checked })}
+                      onCheckedChange={(checked) =>
+                        setFormData({ ...formData, inStock: checked })
+                      }
                     />
                   </div>
                   <div className="flex items-center justify-between">
@@ -355,7 +476,9 @@ export default function AddProductPage() {
                     <Switch
                       id="featured"
                       checked={formData.featured}
-                      onCheckedChange={(checked) => setFormData({ ...formData, featured: checked })}
+                      onCheckedChange={(checked) =>
+                        setFormData({ ...formData, featured: checked })
+                      }
                     />
                   </div>
                 </CardContent>
@@ -367,6 +490,7 @@ export default function AddProductPage() {
                   <ul className="text-sm text-blue-800 space-y-1">
                     <li>• Use descriptive product names</li>
                     <li>• SKU should be unique</li>
+                    <li>• Sub category helps buyers filter products</li>
                     <li>• Add detailed specifications</li>
                     <li>• Use high-quality images</li>
                     <li>• Set realistic pricing</li>
