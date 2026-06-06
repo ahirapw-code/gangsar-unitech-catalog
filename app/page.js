@@ -1,89 +1,297 @@
 'use client';
 
-import { useEffect, useRef } from "react";
+import { useEffect, useState } from 'react';
+import Link from 'next/link';
+import Image from 'next/image';
+import { motion } from 'framer-motion';
+import { ArrowRight, CheckCircle, Building2, TrendingUp, Shield, Zap, ShoppingCart } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent } from '@/components/ui/card';
+import { useCart } from '@/contexts/CartContext';
+import { toast } from 'sonner';
+import ClientsSection from '@/components/ClientsSection';
 
-const logos = [
-  { name: "Mayora Group", src: "data:image/jpeg;base64,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" },
-  { name: "Sinarmas", src: "data:image/svg+xml;base64,PD94bWwgdmVyc2lvbj0iMS4wIiBlbmNvZGluZz0iVVRGLTgiIHN0YW5kYWxvbmU9Im5vIj8+DQo8IS0tIENyZWF0ZWQgd2l0aCBJbmtzY2FwZSAoaHR0cDovL3d3dy5pbmtzY2FwZS5vcmcvKSAtLT4NCg0KPHN2Zw0KICAgeG1sbnM6ZGM9Imh0dHA6Ly9wdXJsLm9yZy9kYy9lbGVtZW50cy8xLjEvIg0KICAgeG1sbnM6Y2M9Imh0dHA6Ly9jcmVhdGl2ZWNvbW1vbnMub3JnL25zIyINCiAgIHhtbG5zOnJkZj0iaHR0cDovL3d3dy53My5vcmcvMTk5OS8wMi8yMi1yZGYtc3ludGF4LW5zIyINCiAgIHhtbG5zOnN2Zz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciDQogICB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciDQogICB4bWxuczpzb2RpcG9kaT0iaHR0cDovL3NvZGlwb2RpLnNvdXJjZWZvcmdlLm5ldC9EVEQvc29kaXBvZGktMC5kdGQiDQogICB4bWxuczppbmtzY2FwZT0iaHR0cDovL3d3dy5pbmtzY2FwZS5vcmcvbmFtZXNwYWNlcy9pbmtzY2FwZSINCiAgIHdpZHRoPSI2NjguMDYzNTA5MjcyIg0KICAgaGVpZ2h0PSIxNDkuNjg2MzY3NTU3Ig0KICAgdmlld0JveD0iMCAwIDI2NC41ODMzNCA1OS4yODI1NjciDQogICB2ZXJzaW9uPSIxLjEiDQogICBpZD0ic3ZnMTA4MyI+DQogIDxnIGlkPSJsYXllcjEiPjwvZz4NCjwvc3ZnPg==" },
-  { name: "Wismilak", src: "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxMDAgMTAwIj48dGV4dCB5PSIuOWVtIiBmb250LXNpemU9IjkwIj5XPC90ZXh0Pjwvc3ZnPg==" },
-  { name: "Wings", src: "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxMDAgMTAwIj48dGV4dCB5PSIuOWVtIiBmb250LXNpemU9IjkwIj5XPC90ZXh0Pjwvc3ZnPg==" },
-];
-
-const tripled = [...logos, ...logos, ...logos];
-
-export default function ClientsSection() {
-  const trackRef = useRef(null);
-  const animRef = useRef(null);
-  const posRef = useRef(0);
-  const pausedRef = useRef(false);
+export default function HomePage() {
+  const [promoProducts, setPromoProducts] = useState([]);
+  const [categories, setCategories] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const { addToCart } = useCart();
 
   useEffect(() => {
-    const track = trackRef.current;
-    if (!track) return;
-    let singleWidth = track.scrollWidth / 3;
-    const handleResize = () => {
-      singleWidth = track.scrollWidth / 3;
-    };
-    window.addEventListener('resize', handleResize);
-    const animate = () => {
-      if (!pausedRef.current) {
-        posRef.current += 0.5;
-        if (posRef.current >= singleWidth) posRef.current -= singleWidth;
-        track.style.transform = `translateX(-${posRef.current}px)`;
+    async function fetchData() {
+      try {
+        const [promoRes, categoriesRes] = await Promise.all([
+          fetch('/api/products?promo=true&limit=6', { cache: 'no-store' }),
+          fetch('/api/categories', { cache: 'no-store' })
+        ]);
+
+        if (!promoRes.ok || !categoriesRes.ok) {
+          throw new Error('Failed to fetch data');
+        }
+
+        const promoData = await promoRes.json();
+        const categoriesData = await categoriesRes.json();
+
+        setPromoProducts(promoData.products || []);
+        setCategories(categoriesData || []);
+      } catch (error) {
+        console.error('Error fetching data:', error);
+        setPromoProducts([]);
+        setCategories([]);
+      } finally {
+        setLoading(false);
       }
-      animRef.current = requestAnimationFrame(animate);
-    };
-    animRef.current = requestAnimationFrame(animate);
-    return () => {
-      cancelAnimationFrame(animRef.current);
-      window.removeEventListener('resize', handleResize);
-    };
+    }
+
+    fetchData();
   }, []);
 
+  const handleAddToCart = (product) => {
+    addToCart(product);
+    toast.success(`${product.name} added to cart!`);
+  };
+
   return (
-    <section style={{ padding: "64px 0", background: "#f9f9f7", overflow: "hidden" }}>
-      <div style={{ textAlign: "center", marginBottom: "48px" }}>
-        <p style={{ fontSize: "11px", fontWeight: 700, letterSpacing: "0.18em", textTransform: "uppercase", color: "#1E8E5A", marginBottom: "10px" }}>
-          Dipercaya oleh
-        </p>
-        <h2 style={{ fontSize: "clamp(1.75rem, 4vw, 2.5rem)", fontWeight: 700, color: "#111", margin: 0 }}>
-          Perusahaan yang Telah Kami Layani
-        </h2>
-      </div>
-      <div
-        style={{ overflow: "hidden", position: "relative" }}
-        onMouseEnter={() => { pausedRef.current = true; }}
-        onMouseLeave={() => { pausedRef.current = false; }}
-      >
-        <div
-          ref={trackRef}
-          style={{ display: "flex", alignItems: "center", gap: "32px", width: "max-content", padding: "8px 0" }}
-        >
-          {tripled.map((logo, i) => (
-            <div
-              key={i}
-              style={{
-                flexShrink: 0,
-                width: "180px",
-                height: "90px",
-                background: "#fff",
-                borderRadius: "12px",
-                border: "1px solid #e5e5e5",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                padding: "14px",
-              }}
-            >
-              <img
-                src={logo.src}
-                alt={logo.name}
-                style={{ maxWidth: "100%", maxHeight: "100%", objectFit: "contain" }}
-              />
-            </div>
-          ))}
+    <div className="bg-white">
+      {/* Hero Section */}
+      <section className="relative bg-gradient-to-br from-gray-900 via-gray-800 to-[#1E8E5A] text-white overflow-hidden">
+        <div className="absolute inset-0 opacity-10">
+          <Image
+            src="https://images.unsplash.com/photo-1578776349090-de61da00ff1a?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjY2NzF8MHwxfHNlYXJjaHwxfHxmYWN0b3J5fGVufDB8fHxibHVlfDE3Nzk4NzExNzJ8MA&ixlib=rb-4.1.0&q=85"
+            alt="Industrial Background"
+            fill
+            className="object-cover"
+          />
         </div>
-      </div>
-    </section>
+        <div className="container mx-auto px-4 py-24 md:py-32 relative z-10">
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.8 }}
+            className="max-w-3xl"
+          >
+            <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold mb-6 leading-tight">
+              Premium Industrial Machinery Solutions
+            </h1>
+            <p className="text-xl md:text-2xl mb-8 text-gray-300">
+              Your trusted partner for high-quality spareparts, bearings, valves, and engineering components in Surabaya.
+            </p>
+            <div className="flex flex-col sm:flex-row gap-4">
+              <Link href="/products">
+                <Button size="lg" className="bg-[#1E8E5A] hover:bg-[#15663f] text-white">
+                  Browse Products
+                  <ArrowRight className="ml-2 h-5 w-5" />
+                </Button>
+              </Link>
+              <Link href="/rfq">
+                <Button size="lg" variant="outline" className="border-white text-white bg-white/10 hover:bg-white hover:text-gray-900">
+                  Request Quotation
+                </Button>
+              </Link>
+            </div>
+          </motion.div>
+        </div>
+      </section>
+
+      {/* About Section */}
+      <section className="py-16 bg-gray-50">
+        <div className="container mx-auto px-4">
+          <div className="max-w-3xl mx-auto text-center">
+            <h2 className="text-3xl md:text-4xl font-bold mb-6 text-gray-900">
+              About Gangsar Unitech
+            </h2>
+            <p className="text-lg text-gray-700 leading-relaxed">
+              Gangsar Unitech is a leading supplier of industrial machinery spareparts based in Surabaya, Indonesia.
+              We specialize in providing high-quality bearings, valves, gearboxes, pumps, and mechanical components
+              to factories, manufacturing companies, and engineering teams across Indonesia.
+            </p>
+          </div>
+        </div>
+      </section>
+
+      {/* Promo Products */}
+      {promoProducts.length > 0 && (
+        <section className="py-16">
+          <div className="container mx-auto px-4">
+            <div className="flex items-center justify-between mb-8">
+              <div>
+                <h2 className="text-3xl md:text-4xl font-bold text-gray-900">Special Promotions</h2>
+                <p className="text-gray-600 mt-2">Limited time offers on selected products</p>
+              </div>
+              <Link href="/products?promo=true">
+                <Button variant="outline" className="hidden md:flex">
+                  View All Promos
+                  <ArrowRight className="ml-2 h-4 w-4" />
+                </Button>
+              </Link>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {promoProducts.map((product, index) => (
+                <motion.div
+                  key={product.id}
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: index * 0.1 }}
+                >
+                  <Card className="overflow-hidden hover:shadow-lg transition-shadow group">
+                    <div className="relative h-48 bg-gray-100 overflow-hidden">
+                      <Image
+                        src={product.images[0]}
+                        alt={product.name}
+                        fill
+                        className="object-cover group-hover:scale-105 transition-transform duration-300"
+                      />
+                      {product.isPromo && (
+                        <div className="absolute top-4 right-4 bg-red-500 text-white px-3 py-1 rounded-full text-sm font-semibold">
+                          -{product.discount}%
+                        </div>
+                      )}
+                    </div>
+                    <CardContent className="p-6">
+                      <div className="text-xs text-gray-500 mb-2">SKU: {product.sku}</div>
+                      <h3 className="font-semibold text-lg mb-2 line-clamp-2">{product.name}</h3>
+                      <p className="text-sm text-gray-600 mb-4 line-clamp-2">{product.description}</p>
+                      <div className="flex items-center justify-between mb-4">
+                        <div>
+                          <div className="text-2xl font-bold text-[#1E8E5A]">
+                            Rp {product.price.toLocaleString('id-ID')}
+                          </div>
+                          {product.isPromo && (
+                            <div className="text-sm text-gray-500 line-through">
+                              Rp {product.originalPrice.toLocaleString('id-ID')}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                      <div className="flex gap-2">
+                        <Link href={`/products/${product.slug}`} className="flex-1">
+                          <Button variant="outline" className="w-full">
+                            Details
+                          </Button>
+                        </Link>
+                        <Button
+                          onClick={() => handleAddToCart(product)}
+                          className="flex-1 bg-[#1E8E5A] hover:bg-[#15663f]"
+                        >
+                          <ShoppingCart className="mr-2 h-4 w-4" />
+                          Add to Cart
+                        </Button>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </motion.div>
+              ))}
+            </div>
+          </div>
+        </section>
+      )}
+
+      {/* Categories */}
+      <section className="py-16 bg-gray-50">
+        <div className="container mx-auto px-4">
+          <div className="text-center mb-12">
+            <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-4">Product Categories</h2>
+            <p className="text-gray-600 max-w-2xl mx-auto">
+              Explore our comprehensive range of industrial spareparts and machinery components
+            </p>
+          </div>
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+            {categories.map((category, index) => (
+              <motion.div
+                key={category.id}
+                initial={{ opacity: 0, scale: 0.9 }}
+                animate={{ opacity: 1, scale: 1 }}
+                transition={{ delay: index * 0.05 }}
+              >
+                <Link href={`/products?category=${category.slug}`}>
+                  <Card className="hover:shadow-lg transition-all hover:scale-105 cursor-pointer">
+                    <div className="relative h-32 bg-gradient-to-br from-gray-100 to-gray-200 overflow-hidden">
+                      <Image
+                        src={category.image}
+                        alt={category.name}
+                        fill
+                        className="object-cover opacity-80"
+                      />
+                    </div>
+                    <CardContent className="p-4 text-center">
+                      <h3 className="font-semibold text-sm">{category.name}</h3>
+                    </CardContent>
+                  </Card>
+                </Link>
+              </motion.div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* Why Choose Us */}
+      <section className="py-16">
+        <div className="container mx-auto px-4">
+          <div className="text-center mb-12">
+            <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-4">Why Choose Gangsar Unitech?</h2>
+          </div>
+          <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-8">
+            {[
+              {
+                icon: Shield,
+                title: 'Genuine Products',
+                description: 'Only authentic, industrial-grade quality products from trusted manufacturers',
+              },
+              {
+                icon: Zap,
+                title: 'Fast Response',
+                description: 'Quick quotation turnaround and efficient delivery to keep your operations running',
+              },
+              {
+                icon: TrendingUp,
+                title: 'Competitive Pricing',
+                description: 'Best value for quality products with transparent pricing and bulk discounts',
+              },
+              {
+                icon: Building2,
+                title: 'Technical Support',
+                description: 'Expert guidance and support from our experienced engineering team',
+              },
+            ].map((feature, index) => (
+              <motion.div
+                key={index}
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: index * 0.1 }}
+              >
+                <Card className="text-center p-6 hover:shadow-lg transition-shadow h-full">
+                  <div className="w-16 h-16 bg-[#1E8E5A]/10 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <feature.icon className="h-8 w-8 text-[#1E8E5A]" />
+                  </div>
+                  <h3 className="font-semibold text-xl mb-3">{feature.title}</h3>
+                  <p className="text-gray-600">{feature.description}</p>
+                </Card>
+              </motion.div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* Clients / Logo Ticker */}
+      <ClientsSection />
+
+      {/* CTA Banner */}
+      <section className="py-16 bg-gradient-to-r from-[#1E8E5A] to-[#15663f] text-white">
+        <div className="container mx-auto px-4 text-center">
+          <h2 className="text-3xl md:text-4xl font-bold mb-4">
+            Need a Custom Quotation?
+          </h2>
+          <p className="text-xl mb-8 text-gray-100">
+            Our team is ready to provide competitive pricing for your specific requirements
+          </p>
+          <Link href="/rfq">
+            <Button size="lg" variant="secondary" className="bg-white text-[#1E8E5A] hover:bg-gray-100">
+              Request Quote Now
+              <ArrowRight className="ml-2 h-5 w-5" />
+            </Button>
+          </Link>
+        </div>
+      </section>
+    </div>
   );
 }
