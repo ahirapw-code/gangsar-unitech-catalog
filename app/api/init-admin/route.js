@@ -6,7 +6,7 @@ export async function GET(request) {
   try {
     const db = await getDb();
     
-    const adminEmail = process.env.ADMIN_DEFAULT_EMAIL || 'admin@gangsarunitech.com';
+    const adminEmail = process.env.ADMIN_DEFAULT_EMAIL || 'admin@gangsarunitech.id';
     const adminPassword = process.env.ADMIN_DEFAULT_PASSWORD || 'Admin@123456';
     
     // Check if admin exists
