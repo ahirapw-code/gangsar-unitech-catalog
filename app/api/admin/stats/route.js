@@ -1,24 +1,22 @@
-// app/api/admin/stats/route.js
 import { NextResponse } from 'next/server';
 import { connectToDatabase } from '@/lib/db';
 
-export async function GET(request) {
+export async function GET() {
   try {
     const { db } = await connectToDatabase();
-
-    const [totalProducts, totalRfqs, promoProducts, outOfStock, preOrderProducts] = await Promise.all([
+    const [totalProducts, totalRFQs, pendingRFQs, promoProducts, preOrderProducts] = await Promise.all([
       db.collection('products').countDocuments({}),
       db.collection('rfqs').countDocuments({}),
+      db.collection('rfqs').countDocuments({ status: 'pending' }),
       db.collection('products').countDocuments({ isPromo: true }),
-      db.collection('products').countDocuments({ inStock: false }),
       db.collection('products').countDocuments({ preOrder: true }),
     ]);
-
     return NextResponse.json({
       totalProducts,
-      totalRfqs,
+      totalCategories: 5,   // static — always 5 master categories
+      totalRFQs,
+      pendingRFQs,
       promoProducts,
-      outOfStock,
       preOrderProducts,
     });
   } catch (error) {
