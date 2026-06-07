@@ -2,6 +2,24 @@
 import { NextResponse } from 'next/server';
 import clientPromise from '@/lib/mongodb';
 
+const MASTER_CATEGORIES = [
+  { id: 'cat-electrical', name: 'Electrical', slug: 'electrical',
+    image: 'https://images.unsplash.com/photo-1555664424-778a1e5e1b48?w=400&q=80',
+    description: 'Electrical components, cables, switches, and control panels', order: 1 },
+  { id: 'cat-mechanical', name: 'Mechanical', slug: 'mechanical',
+    image: 'https://images.unsplash.com/photo-1581092918056-0c4c3acd3789?w=400&q=80',
+    description: 'Gears, shafts, couplings, and mechanical transmission parts', order: 2 },
+  { id: 'cat-pneumatic', name: 'Pneumatic', slug: 'pneumatic',
+    image: 'https://images.unsplash.com/photo-1504328345606-18bbc8c9d7d1?w=400&q=80',
+    description: 'Pneumatic cylinders, valves, fittings, and air preparation units', order: 3 },
+  { id: 'cat-bearing', name: 'Bearing', slug: 'bearing',
+    image: 'https://images.unsplash.com/photo-1587293852726-70cdb56c2866?w=400&q=80',
+    description: 'Ball bearings, roller bearings, pillow blocks, and related parts', order: 4 },
+  { id: 'cat-general', name: 'General', slug: 'general',
+    image: 'https://images.unsplash.com/photo-1516937941344-00b4e0337589?w=400&q=80',
+    description: 'General industrial spareparts and miscellaneous components', order: 5 },
+];
+
 export async function GET(request) {
   try {
     const { pathname, searchParams } = new URL(request.url);
@@ -59,9 +77,25 @@ export async function GET(request) {
     }
 
     if (resource === 'categories') {
-      const categories = await db.collection('categories').find({}).sort({ order: 1 }).toArray();
-      const serialized = categories.map(({ _id, ...rest }) => ({ id: _id.toString(), ...rest }));
-      return NextResponse.json(serialized);
+      // withSubcategories: derive from products collection
+      const withSub = searchParams.get('withSubcategories') === 'true';
+      if (!withSub) return NextResponse.json(MASTER_CATEGORIES);
+
+      const products = await db.collection('products').find({}).toArray();
+      const subcatMap = {};
+      products.forEach((p) => {
+        const slug = p.categorySlug || p.category?.toLowerCase().replace(/\s+/g, '-');
+        const subcat = p.subcategory?.trim();
+        if (slug && subcat) {
+          if (!subcatMap[slug]) subcatMap[slug] = new Set();
+          subcatMap[slug].add(subcat);
+        }
+      });
+      const result = MASTER_CATEGORIES.map((cat) => ({
+        ...cat,
+        subcategories: subcatMap[cat.slug] ? Array.from(subcatMap[cat.slug]).sort() : [],
+      }));
+      return NextResponse.json(result);
     }
 
     return NextResponse.json({ error: 'Not found' }, { status: 404 });
