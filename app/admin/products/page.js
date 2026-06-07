@@ -111,11 +111,13 @@ export default function AdminProductsPage() {
         body: JSON.stringify({ ...product, isPromo: !product.isPromo })
       });
 
+      const data = await res.json();
       if (res.ok) {
         toast.success('Product updated successfully');
         fetchData(currentPage, searchTerm);
       } else {
-        toast.error('Failed to update product');
+        toast.error('Failed to update: ' + (data.error || res.status));
+        console.error('Product update error:', data);
       }
     } catch (error) {
       toast.error('An error occurred');
