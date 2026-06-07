@@ -1,73 +1,78 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { motion } from 'framer-motion';
-import { 
-  Package, 
-  FolderTree, 
-  FileText, 
-  TrendingUp, 
-  LogOut,
-  Plus,
-  Edit,
-  Trash2,
-  Eye
-} from 'lucide-react';
+import { Plus, Edit, Trash2, Search, ArrowLeft, Package, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { useAdmin } from '@/contexts/AdminContext';
 import { toast } from 'sonner';
+import Image from 'next/image';
 
-export default function AdminDashboardPage() {
+const PRODUCTS_PER_PAGE = 20;
+
+export default function AdminProductsPage() {
   const router = useRouter();
-  const { admin, logout, loading, getToken } = useAdmin();
-  const [stats, setStats] = useState(null);
+  const { admin, loading, getToken } = useAdmin();
   const [products, setProducts] = useState([]);
-  const [rfqs, setRfqs] = useState([]);
+  const [totalProducts, setTotalProducts] = useState(0);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [searchInput, setSearchInput] = useState('');
   const [loadingData, setLoadingData] = useState(true);
+
+  const totalPages = Math.ceil(totalProducts / PRODUCTS_PER_PAGE);
 
   useEffect(() => {
     if (!loading && !admin) {
       router.push('/admin/login');
     } else if (admin) {
-      fetchData();
+      fetchData(currentPage, searchTerm);
     }
-  }, [admin, loading, router]);
+  }, [admin, loading, router, currentPage, searchTerm]);
 
-  async function fetchData() {
-    const token = getToken();
-    if (!token) return;
+  // Reset ke page 1 ketika search berubah
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm]);
 
+  async function fetchData(page, search) {
+    setLoadingData(true);
     try {
-      const [statsRes, productsRes, rfqsRes] = await Promise.all([
-        fetch('/api/admin/stats', {
-          headers: { 'Authorization': `Bearer ${token}` }
-        }),
-        fetch('/api/products?limit=5'),
-        fetch('/api/rfq', {
-          headers: { 'Authorization': `Bearer ${token}` }
-        })
-      ]);
+      const params = new URLSearchParams({
+        page,
+        limit: PRODUCTS_PER_PAGE,
+        ...(search && { search }),
+      });
 
-      const statsData = await statsRes.json();
-      const productsData = await productsRes.json();
-      const rfqsData = await rfqsRes.json();
+      const res = await fetch(`/api/products?${params}`);
+      const data = await res.json();
 
-      setStats(statsData);
-      setProducts(productsData.products || []);
-      setRfqs(rfqsData.slice(0, 5) || []);
+      setProducts(data.products || []);
+      // API mengembalikan total di dalam object pagination
+      setTotalProducts(data.pagination?.total ?? data.products?.length ?? 0);
     } catch (error) {
       console.error('Error fetching data:', error);
+      toast.error('Failed to load products');
     } finally {
       setLoadingData(false);
     }
   }
 
-  const handleDeleteProduct = async (id) => {
-    if (!confirm('Are you sure you want to delete this product?')) return;
+  // Debounce search agar tidak kirim request setiap ketikan
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setSearchTerm(searchInput);
+    }, 400);
+    return () => clearTimeout(timer);
+  }, [searchInput]);
+
+  const handleDelete = async (id, name) => {
+    if (!confirm(`Are you sure you want to delete "${name}"?`)) return;
 
     const token = getToken();
     try {
@@ -78,13 +83,63 @@ export default function AdminDashboardPage() {
 
       if (res.ok) {
         toast.success('Product deleted successfully');
-        fetchData();
+        // Kalau halaman ini jadi kosong setelah hapus, kembali ke halaman sebelumnya
+        const newTotal = totalProducts - 1;
+        const newTotalPages = Math.ceil(newTotal / PRODUCTS_PER_PAGE);
+        if (currentPage > newTotalPages && newTotalPages > 0) {
+          setCurrentPage(newTotalPages);
+        } else {
+          fetchData(currentPage, searchTerm);
+        }
       } else {
         toast.error('Failed to delete product');
       }
     } catch (error) {
       toast.error('An error occurred');
     }
+  };
+
+  const handleTogglePromo = async (product) => {
+    const token = getToken();
+    try {
+      const res = await fetch(`/api/products/${product.id}`, {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ ...product, isPromo: !product.isPromo })
+      });
+
+      if (res.ok) {
+        toast.success('Product updated successfully');
+        fetchData(currentPage, searchTerm);
+      } else {
+        toast.error('Failed to update product');
+      }
+    } catch (error) {
+      toast.error('An error occurred');
+    }
+  };
+
+  const goToPage = (page) => {
+    if (page < 1 || page > totalPages) return;
+    setCurrentPage(page);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  // Buat range nomor halaman yang ditampilkan (maks 5 angka)
+  const getPageNumbers = () => {
+    const delta = 2;
+    const range = [];
+    for (
+      let i = Math.max(1, currentPage - delta);
+      i <= Math.min(totalPages, currentPage + delta);
+      i++
+    ) {
+      range.push(i);
+    }
+    return range;
   };
 
   if (loading || !admin) {
@@ -101,199 +156,252 @@ export default function AdminDashboardPage() {
       <div className="bg-white border-b">
         <div className="container mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-2xl font-bold text-gray-900">Admin Dashboard</h1>
-              <p className="text-gray-600">Welcome back, {admin.email}</p>
-            </div>
             <div className="flex items-center gap-4">
-              <Link href="/">
-                <Button variant="outline">
-                  View Website
+              <Link href="/admin/dashboard">
+                <Button variant="ghost" size="sm">
+                  <ArrowLeft className="mr-2 h-4 w-4" />
+                  Back to Dashboard
                 </Button>
               </Link>
-              <Button variant="destructive" onClick={logout}>
-                <LogOut className="mr-2 h-4 w-4" />
-                Logout
-              </Button>
+              <div>
+                <h1 className="text-2xl font-bold text-gray-900">Product Management</h1>
+                <p className="text-gray-600">
+                  {totalProducts} total product{totalProducts !== 1 ? 's' : ''}
+                  {searchTerm && ` · hasil pencarian "${searchTerm}"`}
+                </p>
+              </div>
             </div>
+            <Link href="/admin/products/add">
+              <Button className="bg-[#1E8E5A] hover:bg-[#15663f]">
+                <Plus className="mr-2 h-4 w-4" />
+                Add New Product
+              </Button>
+            </Link>
           </div>
         </div>
       </div>
 
       <div className="container mx-auto px-4 py-8">
-        {/* Stats Cards */}
-        {stats && (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-            <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
-              <Card>
-                <CardContent className="p-6">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm text-gray-600 mb-1">Total Products</p>
-                      <p className="text-3xl font-bold text-gray-900">{stats.totalProducts}</p>
-                    </div>
-                    <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center">
-                      <Package className="h-6 w-6 text-blue-600" />
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            </motion.div>
-
-            <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}>
-              <Card>
-                <CardContent className="p-6">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm text-gray-600 mb-1">Categories</p>
-                      <p className="text-3xl font-bold text-gray-900">{stats.totalCategories}</p>
-                    </div>
-                    <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center">
-                      <FolderTree className="h-6 w-6 text-green-600" />
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            </motion.div>
-
-            <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}>
-              <Card>
-                <CardContent className="p-6">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm text-gray-600 mb-1">Total RFQs</p>
-                      <p className="text-3xl font-bold text-gray-900">{stats.totalRFQs}</p>
-                    </div>
-                    <div className="w-12 h-12 bg-purple-100 rounded-full flex items-center justify-center">
-                      <FileText className="h-6 w-6 text-purple-600" />
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            </motion.div>
-
-            <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }}>
-              <Card>
-                <CardContent className="p-6">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm text-gray-600 mb-1">Pending RFQs</p>
-                      <p className="text-3xl font-bold text-gray-900">{stats.pendingRFQs}</p>
-                    </div>
-                    <div className="w-12 h-12 bg-orange-100 rounded-full flex items-center justify-center">
-                      <TrendingUp className="h-6 w-6 text-orange-600" />
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            </motion.div>
-          </div>
-        )}
-
-        {/* Quick Actions */}
-        <div className="grid md:grid-cols-2 gap-6 mb-8">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between">
-              <CardTitle>Recent Products</CardTitle>
-              <Link href="/admin/products">
-                <Button size="sm" className="bg-[#1E8E5A] hover:bg-[#15663f]">
-                  <Package className="mr-2 h-4 w-4" />
-                  Manage Products
-                </Button>
-              </Link>
-            </CardHeader>
-            <CardContent>
-              {loadingData ? (
-                <div className="text-center py-8 text-gray-500">Loading...</div>
-              ) : products.length > 0 ? (
-                <div className="space-y-3">
-                  {products.map((product) => (
-                    <div key={product.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                      <div className="flex-1">
-                        <p className="font-medium text-sm">{product.name}</p>
-                        <p className="text-xs text-gray-600">SKU: {product.sku}</p>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        {product.isPromo && (
-                          <Badge variant="destructive" className="text-xs">Promo</Badge>
-                        )}
-                        {product.preOrder && (
-                          <Badge className="bg-purple-500 text-white text-xs">Pre-order</Badge>
-                        )}
-                        {!product.inStock && (
-                          <Badge variant="secondary" className="text-xs">Out of Stock</Badge>
-                        )}
-                        <Button size="sm" variant="ghost">
-                          <Edit className="h-4 w-4" />
-                        </Button>
-                        <Button 
-                          size="sm" 
-                          variant="ghost"
-                          onClick={() => handleDeleteProduct(product.id)}
-                        >
-                          <Trash2 className="h-4 w-4 text-red-500" />
-                        </Button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <div className="text-center py-8 text-gray-500">No products yet</div>
-              )}
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between">
-              <CardTitle>Recent RFQs</CardTitle>
-              <Link href="/admin/rfq">
-                <Button size="sm" variant="outline">
-                  <FileText className="mr-2 h-4 w-4" />
-                  View All RFQs
-                </Button>
-              </Link>
-            </CardHeader>
-            <CardContent>
-              {loadingData ? (
-                <div className="text-center py-8 text-gray-500">Loading...</div>
-              ) : rfqs.length > 0 ? (
-                <div className="space-y-3">
-                  {rfqs.map((rfq) => (
-                    <div key={rfq.id} className="p-3 bg-gray-50 rounded-lg">
-                      <div className="flex items-center justify-between mb-2">
-                        <p className="font-medium text-sm">{rfq.companyName}</p>
-                        <Badge variant={rfq.status === 'pending' ? 'secondary' : 'default'}>
-                          {rfq.status}
-                        </Badge>
-                      </div>
-                      <p className="text-xs text-gray-600">{rfq.fullName}</p>
-                      <p className="text-xs text-gray-600">{rfq.email}</p>
-                      <p className="text-xs text-gray-500 mt-1">
-                        {rfq.products?.length || 0} products requested
-                      </p>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <div className="text-center py-8 text-gray-500">No RFQs yet</div>
-              )}
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Info Box */}
-        <Card className="bg-blue-50 border-blue-200">
-          <CardContent className="p-6">
-            <h3 className="font-semibold text-blue-900 mb-2">Email Configuration</h3>
-            <p className="text-sm text-blue-800">
-              To enable email notifications for RFQs, please update your Gmail SMTP credentials in the <code className="bg-blue-200 px-2 py-1 rounded">.env</code> file:
-            </p>
-            <ul className="text-sm text-blue-800 mt-2 ml-4 list-disc">
-              <li>SMTP_USER: Your Gmail address</li>
-              <li>SMTP_PASS: Your App-specific password</li>
-            </ul>
+        {/* Search */}
+        <Card className="mb-6">
+          <CardContent className="p-4">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-5 w-5" />
+              <Input
+                type="text"
+                placeholder="Search by product name or SKU..."
+                value={searchInput}
+                onChange={(e) => setSearchInput(e.target.value)}
+                className="pl-10"
+              />
+            </div>
           </CardContent>
         </Card>
+
+        {/* Products List */}
+        {loadingData ? (
+          <div className="text-center py-12">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#1E8E5A] mx-auto"></div>
+          </div>
+        ) : products.length > 0 ? (
+          <>
+            <div className="space-y-4">
+              {products.map((product, i) => (
+                <motion.div
+                  key={product.id}
+                  initial={{ opacity: 0, y: 16 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: i * 0.03 }}
+                >
+                  <Card>
+                    <CardContent className="p-4">
+                      <div className="flex gap-4">
+                        <div className="relative w-24 h-24 bg-gray-100 rounded-lg overflow-hidden flex-shrink-0">
+                          {product.images?.[0] ? (
+                            <Image
+                              src={product.images[0]}
+                              alt={product.name}
+                              fill
+                              className="object-cover"
+                            />
+                          ) : (
+                            <div className="w-full h-full flex items-center justify-center">
+                              <Package className="h-8 w-8 text-gray-300" />
+                            </div>
+                          )}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-start justify-between mb-2">
+                            <div>
+                              <h3 className="font-semibold text-lg leading-tight">{product.name}</h3>
+                              <p className="text-sm text-gray-600">SKU: {product.sku}</p>
+                              <p className="text-sm text-gray-600">{product.category}</p>
+                            </div>
+                            <div className="flex items-center gap-2 flex-shrink-0 ml-2">
+                              {product.isPromo && (
+                                <Badge variant="destructive">Promo -{product.discount}%</Badge>
+                              )}
+                              {product.preOrder && (
+                                <Badge className="bg-purple-500 text-white">Pre-order</Badge>
+                              )}
+                              {product.inStock ? (
+                                <Badge variant="default" className="bg-green-500">In Stock</Badge>
+                              ) : (
+                                <Badge variant="secondary">Out of Stock</Badge>
+                              )}
+                            </div>
+                          </div>
+                          <p className="text-sm text-gray-700 mb-3 line-clamp-2">{product.description}</p>
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <span className="text-xl font-bold text-[#1E8E5A]">
+                                Rp {product.price.toLocaleString('id-ID')}
+                              </span>
+                              {product.isPromo && (
+                                <span className="text-sm text-gray-500 line-through ml-2">
+                                  Rp {product.originalPrice.toLocaleString('id-ID')}
+                                </span>
+                              )}
+                            </div>
+                            <div className="flex gap-2">
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => handleTogglePromo(product)}
+                              >
+                                {product.isPromo ? 'Remove Promo' : 'Set Promo'}
+                              </Button>
+                              <Link href={`/admin/products/edit/${product.id}`}>
+                                <Button size="sm" variant="outline">
+                                  <Edit className="h-4 w-4 mr-1" />
+                                  Edit
+                                </Button>
+                              </Link>
+                              <Button
+                                size="sm"
+                                variant="destructive"
+                                onClick={() => handleDelete(product.id, product.name)}
+                              >
+                                <Trash2 className="h-4 w-4 mr-1" />
+                                Delete
+                              </Button>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </motion.div>
+              ))}
+            </div>
+
+            {/* Pagination */}
+            {totalPages > 1 && (
+              <div className="mt-8 flex flex-col items-center gap-3">
+                {/* Info halaman */}
+                <p className="text-sm text-gray-500">
+                  Halaman {currentPage} dari {totalPages} &nbsp;·&nbsp;
+                  Menampilkan {(currentPage - 1) * PRODUCTS_PER_PAGE + 1}–
+                  {Math.min(currentPage * PRODUCTS_PER_PAGE, totalProducts)} dari {totalProducts} produk
+                </p>
+
+                {/* Tombol navigasi */}
+                <div className="flex items-center gap-1">
+                  {/* Tombol First */}
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => goToPage(1)}
+                    disabled={currentPage === 1}
+                    className="hidden sm:flex"
+                  >
+                    «
+                  </Button>
+
+                  {/* Tombol Prev */}
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => goToPage(currentPage - 1)}
+                    disabled={currentPage === 1}
+                  >
+                    <ChevronLeft className="h-4 w-4" />
+                    Prev
+                  </Button>
+
+                  {/* Ellipsis kiri */}
+                  {getPageNumbers()[0] > 1 && (
+                    <span className="px-2 text-gray-400 hidden sm:block">…</span>
+                  )}
+
+                  {/* Nomor halaman */}
+                  {getPageNumbers().map((page) => (
+                    <Button
+                      key={page}
+                      variant={page === currentPage ? 'default' : 'outline'}
+                      size="sm"
+                      onClick={() => goToPage(page)}
+                      className={`w-9 hidden sm:flex ${
+                        page === currentPage ? 'bg-[#1E8E5A] hover:bg-[#15663f]' : ''
+                      }`}
+                    >
+                      {page}
+                    </Button>
+                  ))}
+
+                  {/* Ellipsis kanan */}
+                  {getPageNumbers().at(-1) < totalPages && (
+                    <span className="px-2 text-gray-400 hidden sm:block">…</span>
+                  )}
+
+                  {/* Tombol Next */}
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => goToPage(currentPage + 1)}
+                    disabled={currentPage === totalPages}
+                  >
+                    Next
+                    <ChevronRight className="h-4 w-4" />
+                  </Button>
+
+                  {/* Tombol Last */}
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => goToPage(totalPages)}
+                    disabled={currentPage === totalPages}
+                    className="hidden sm:flex"
+                  >
+                    »
+                  </Button>
+                </div>
+              </div>
+            )}
+          </>
+        ) : (
+          <Card>
+            <CardContent className="p-12 text-center">
+              <Package className="h-16 w-16 text-gray-300 mx-auto mb-4" />
+              <h3 className="text-lg font-semibold text-gray-900 mb-2">
+                {searchTerm ? 'Produk tidak ditemukan' : 'No products found'}
+              </h3>
+              <p className="text-gray-600 mb-6">
+                {searchTerm
+                  ? `Tidak ada produk yang cocok dengan "${searchTerm}"`
+                  : 'Try adjusting your search or add a new product'}
+              </p>
+              {!searchTerm && (
+                <Link href="/admin/products/add">
+                  <Button className="bg-[#1E8E5A] hover:bg-[#15663f]">
+                    <Plus className="mr-2 h-4 w-4" />
+                    Add First Product
+                  </Button>
+                </Link>
+              )}
+            </CardContent>
+          </Card>
+        )}
       </div>
     </div>
   );
