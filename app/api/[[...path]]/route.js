@@ -58,6 +58,16 @@ export async function GET(request) {
       const page  = parseInt(searchParams.get('page')  || '1',  10);
       const skip  = (page - 1) * limit;
 
+      // Single product by ID
+      const productId = segments[1];
+      if (productId) {
+        const { ObjectId } = await import('mongodb');
+        const product = await db.collection('products').findOne({ _id: new ObjectId(productId) });
+        if (!product) return NextResponse.json({ error: 'Not found' }, { status: 404 });
+        const { _id, ...rest } = product;
+        return NextResponse.json({ id: _id.toString(), ...rest });
+      }
+
       const [products, total] = await Promise.all([
         db.collection('products').find(filter).sort(sort).skip(skip).limit(limit).toArray(),
         db.collection('products').countDocuments(filter),
