@@ -81,6 +81,7 @@ export default function EditProductPage() {
           category:     matchedCat?.name     || product.category     || '',
           categorySlug: matchedCat?.slug     || product.categorySlug || '',
           subcategory:  product.subcategory  || '',
+          preOrder:     product.preOrder     || false,
           price:        product.price.toString(),
           originalPrice:
             product.originalPrice?.toString() || product.price.toString(),
@@ -176,6 +177,7 @@ export default function EditProductPage() {
 
     const productData = {
       ...formData,
+      preOrder: formData.preOrder,
       price: parseFloat(formData.price),
       originalPrice: formData.isPromo
         ? parseFloat(formData.originalPrice || formData.price)
@@ -514,6 +516,19 @@ export default function EditProductPage() {
                       checked={formData.featured}
                       onCheckedChange={(checked) =>
                         setFormData({ ...formData, featured: checked })
+                      }
+                    />
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <Label htmlFor="preOrder">Pre-order</Label>
+                      <p className="text-xs text-gray-500">Product available for pre-order</p>
+                    </div>
+                    <Switch
+                      id="preOrder"
+                      checked={formData.preOrder || false}
+                      onCheckedChange={(checked) =>
+                        setFormData({ ...formData, preOrder: checked })
                       }
                     />
                   </div>
