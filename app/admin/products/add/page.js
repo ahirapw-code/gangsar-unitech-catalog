@@ -45,6 +45,7 @@ export default function AddProductPage() {
     discount: 0,
     inStock: true,
     featured: false,
+    preOrder: false,
     images: [''],
     specifications: [{ label: '', value: '' }],
   });
@@ -136,6 +137,7 @@ export default function AddProductPage() {
 
     const productData = {
       ...formData,
+      preOrder: formData.preOrder,
       price: parseFloat(formData.price),
       originalPrice: formData.isPromo
         ? parseFloat(formData.originalPrice || formData.price)
@@ -478,6 +480,19 @@ export default function AddProductPage() {
                       checked={formData.featured}
                       onCheckedChange={(checked) =>
                         setFormData({ ...formData, featured: checked })
+                      }
+                    />
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <Label htmlFor="preOrder">Pre-order</Label>
+                      <p className="text-xs text-gray-500">Product available for pre-order</p>
+                    </div>
+                    <Switch
+                      id="preOrder"
+                      checked={formData.preOrder}
+                      onCheckedChange={(checked) =>
+                        setFormData({ ...formData, preOrder: checked })
                       }
                     />
                   </div>
