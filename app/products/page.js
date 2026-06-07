@@ -241,6 +241,11 @@ export default function ProductsPage() {
                         -{product.discount}%
                       </div>
                     )}
+                    {product.preOrder && (
+                      <div className="absolute top-3 left-3 bg-purple-500 text-white px-2 py-1 rounded-full text-xs font-semibold">
+                        Pre-order
+                      </div>
+                    )}
                   </div>
                   <CardContent className="p-4 flex-1 flex flex-col">
                     <div className="text-xs text-gray-500 mb-1">SKU: {product.sku}</div>
