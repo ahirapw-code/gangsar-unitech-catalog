@@ -241,6 +241,9 @@ export default function AdminProductsPage() {
                               {product.isPromo && (
                                 <Badge variant="destructive">Promo -{product.discount}%</Badge>
                               )}
+                              {product.preOrder && (
+                                <Badge className="bg-purple-500 text-white">Pre-order</Badge>
+                              )}
                               {product.inStock ? (
                                 <Badge variant="default" className="bg-green-500">In Stock</Badge>
                               ) : (
