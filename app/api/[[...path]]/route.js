@@ -154,7 +154,9 @@ export async function PUT(request) {
     const id = segments[1];
 
     const db = await getClientDb();
-    const body = await request.json();
+    const rawBody = await request.json();
+    // Strip 'id' and '_id' from body to avoid MongoDB conflicts
+    const { id: _bodyId, _id: _bodyObjId, ...body } = rawBody;
     const { ObjectId } = await import('mongodb');
 
     if (resource === 'products' && id) {
@@ -164,15 +166,15 @@ export async function PUT(request) {
       } else {
         query = { $or: [{ _id: id }, { id: id }] };
       }
-      await db.collection('products').updateOne(
+      const result = await db.collection('products').updateOne(
         query,
         { $set: { ...body, updatedAt: new Date() } }
       );
+      console.log('Product update result:', JSON.stringify(result));
       return NextResponse.json({ id, ...body });
     }
 
     if (resource === 'rfq' && id) {
-      // Support both ObjectId (24-char hex) and UUID string _id
       let query;
       if (/^[a-f\d]{24}$/i.test(id)) {
         query = { _id: new ObjectId(id) };
@@ -183,8 +185,9 @@ export async function PUT(request) {
         query,
         { $set: { ...body, updatedAt: new Date() } }
       );
+      console.log('RFQ update result:', JSON.stringify(result));
       if (result.matchedCount === 0) {
-        return NextResponse.json({ error: 'RFQ not found' }, { status: 404 });
+        return NextResponse.json({ error: 'RFQ not found with id: ' + id }, { status: 404 });
       }
       return NextResponse.json({ id, ...body });
     }
