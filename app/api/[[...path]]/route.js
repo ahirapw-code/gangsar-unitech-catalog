@@ -158,18 +158,34 @@ export async function PUT(request) {
     const { ObjectId } = await import('mongodb');
 
     if (resource === 'products' && id) {
+      let query;
+      if (/^[a-f\d]{24}$/i.test(id)) {
+        query = { _id: new ObjectId(id) };
+      } else {
+        query = { $or: [{ _id: id }, { id: id }] };
+      }
       await db.collection('products').updateOne(
-        { _id: new ObjectId(id) },
+        query,
         { $set: { ...body, updatedAt: new Date() } }
       );
       return NextResponse.json({ id, ...body });
     }
 
     if (resource === 'rfq' && id) {
-      await db.collection('rfqs').updateOne(
-        { _id: new ObjectId(id) },
+      // Support both ObjectId (24-char hex) and UUID string _id
+      let query;
+      if (/^[a-f\d]{24}$/i.test(id)) {
+        query = { _id: new ObjectId(id) };
+      } else {
+        query = { $or: [{ _id: id }, { id: id }] };
+      }
+      const result = await db.collection('rfqs').updateOne(
+        query,
         { $set: { ...body, updatedAt: new Date() } }
       );
+      if (result.matchedCount === 0) {
+        return NextResponse.json({ error: 'RFQ not found' }, { status: 404 });
+      }
       return NextResponse.json({ id, ...body });
     }
 
@@ -191,12 +207,24 @@ export async function DELETE(request) {
     const { ObjectId } = await import('mongodb');
 
     if (resource === 'products' && id) {
-      await db.collection('products').deleteOne({ _id: new ObjectId(id) });
+      let query;
+      if (/^[a-f\d]{24}$/i.test(id)) {
+        query = { _id: new ObjectId(id) };
+      } else {
+        query = { $or: [{ _id: id }, { id: id }] };
+      }
+      await db.collection('products').deleteOne(query);
       return NextResponse.json({ success: true });
     }
 
     if (resource === 'rfq' && id) {
-      await db.collection('rfqs').deleteOne({ _id: new ObjectId(id) });
+      let query;
+      if (/^[a-f\d]{24}$/i.test(id)) {
+        query = { _id: new ObjectId(id) };
+      } else {
+        query = { $or: [{ _id: id }, { id: id }] };
+      }
+      await db.collection('rfqs').deleteOne(query);
       return NextResponse.json({ success: true });
     }
 
