@@ -1,6 +1,6 @@
 // app/api/[[...path]]/route.js
 import { NextResponse } from 'next/server';
-import clientPromise from '@/lib/mongodb';
+import clientPromise, { getClientDb } from '@/lib/mongodb';
 
 const MASTER_CATEGORIES = [
   { id: 'cat-electrical', name: 'Electrical', slug: 'electrical',
@@ -26,8 +26,7 @@ export async function GET(request) {
     const segments = pathname.replace('/api/', '').split('/');
     const resource = segments[0];
 
-    const client = await clientPromise;
-    const db = client.db();
+    const db = await getClientDb();
 
     if (resource === 'products') {
       const filter = {};
@@ -131,8 +130,7 @@ export async function POST(request) {
     const segments = pathname.replace('/api/', '').split('/');
     const resource = segments[0];
 
-    const client = await clientPromise;
-    const db = client.db();
+    const db = await getClientDb();
     const body = await request.json();
 
     if (resource === 'products') {
@@ -155,8 +153,7 @@ export async function PUT(request) {
     const resource = segments[0];
     const id = segments[1];
 
-    const client = await clientPromise;
-    const db = client.db();
+    const db = await getClientDb();
     const body = await request.json();
     const { ObjectId } = await import('mongodb');
 
@@ -190,8 +187,7 @@ export async function DELETE(request) {
     const resource = segments[0];
     const id = segments[1];
 
-    const client = await clientPromise;
-    const db = client.db();
+    const db = await getClientDb();
     const { ObjectId } = await import('mongodb');
 
     if (resource === 'products' && id) {
