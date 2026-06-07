@@ -90,6 +90,12 @@ export async function GET(request) {
       });
     }
 
+    if (resource === 'rfq') {
+      const rfqs = await db.collection('rfqs').find({}).sort({ createdAt: -1 }).toArray();
+      const serialized = rfqs.map(({ _id, ...rest }) => ({ id: _id.toString(), ...rest }));
+      return NextResponse.json(serialized);
+    }
+
     if (resource === 'categories') {
       // withSubcategories: derive from products collection
       const withSub = searchParams.get('withSubcategories') === 'true';
@@ -162,6 +168,14 @@ export async function PUT(request) {
       return NextResponse.json({ id, ...body });
     }
 
+    if (resource === 'rfq' && id) {
+      await db.collection('rfqs').updateOne(
+        { _id: new ObjectId(id) },
+        { $set: { ...body, updatedAt: new Date() } }
+      );
+      return NextResponse.json({ id, ...body });
+    }
+
     return NextResponse.json({ error: 'Not found' }, { status: 404 });
   } catch (error) {
     console.error('API error:', error);
@@ -182,6 +196,11 @@ export async function DELETE(request) {
 
     if (resource === 'products' && id) {
       await db.collection('products').deleteOne({ _id: new ObjectId(id) });
+      return NextResponse.json({ success: true });
+    }
+
+    if (resource === 'rfq' && id) {
+      await db.collection('rfqs').deleteOne({ _id: new ObjectId(id) });
       return NextResponse.json({ success: true });
     }
 
