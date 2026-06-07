@@ -175,8 +175,8 @@ export async function PUT(request) {
 
     return NextResponse.json({ error: 'Not found' }, { status: 404 });
   } catch (error) {
-    console.error('API error:', error);
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+    console.error('PUT API error:', error);
+    return NextResponse.json({ error: error.message || 'Internal server error' }, { status: 500 });
   }
 }
 
