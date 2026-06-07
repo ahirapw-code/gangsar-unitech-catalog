@@ -217,9 +217,17 @@ export default function AdminDashboardPage() {
                         {product.isPromo && (
                           <Badge variant="destructive" className="text-xs">Promo</Badge>
                         )}
-                        <Button size="sm" variant="ghost">
-                          <Edit className="h-4 w-4" />
-                        </Button>
+                        {product.preOrder && (
+                          <Badge className="bg-purple-500 text-white text-xs">Pre-order</Badge>
+                        )}
+                        {!product.inStock && (
+                          <Badge variant="secondary" className="text-xs">Out of Stock</Badge>
+                        )}
+                        <Link href={`/admin/products/edit/${product.id}`}>
+                          <Button size="sm" variant="ghost">
+                            <Edit className="h-4 w-4" />
+                          </Button>
+                        </Link>
                         <Button 
                           size="sm" 
                           variant="ghost"
