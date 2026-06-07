@@ -60,12 +60,16 @@ export async function GET(request) {
 
       // Single product by ID
       const productId = segments[1];
-      if (productId) {
+      if (productId && productId.length === 24) {
         const { ObjectId } = await import('mongodb');
-        const product = await db.collection('products').findOne({ _id: new ObjectId(productId) });
-        if (!product) return NextResponse.json({ error: 'Not found' }, { status: 404 });
-        const { _id, ...rest } = product;
-        return NextResponse.json({ id: _id.toString(), ...rest });
+        try {
+          const product = await db.collection('products').findOne({ _id: new ObjectId(productId) });
+          if (!product) return NextResponse.json({ error: 'Not found' }, { status: 404 });
+          const { _id, ...rest } = product;
+          return NextResponse.json({ id: _id.toString(), ...rest });
+        } catch {
+          return NextResponse.json({ error: 'Invalid ID' }, { status: 400 });
+        }
       }
 
       const [products, total] = await Promise.all([
