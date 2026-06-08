@@ -33,6 +33,7 @@ export async function GET(request) {
 
       // Filters
       if (searchParams.get('promo') === 'true') filter.isPromo = true;
+      if (searchParams.get('featured') === 'true') filter.featured = true;
       if (searchParams.get('category')) filter.categorySlug = searchParams.get('category');
       if (searchParams.get('subcategory')) filter.subcategory = searchParams.get('subcategory');
 
@@ -61,13 +62,18 @@ export async function GET(request) {
       const productId = segments[1];
       if (productId) {
         let product = null;
-        // Try ObjectId first (24-char hex), fallback to uuid id field
+        // Try ObjectId (24-char hex)
         if (/^[a-f\d]{24}$/i.test(productId)) {
           const { ObjectId } = await import('mongodb');
           product = await db.collection('products').findOne({ _id: new ObjectId(productId) });
         }
+        // Try by uuid id field
         if (!product) {
           product = await db.collection('products').findOne({ id: productId });
+        }
+        // Try by slug
+        if (!product) {
+          product = await db.collection('products').findOne({ slug: productId });
         }
         if (!product) return NextResponse.json({ error: 'Not found' }, { status: 404 });
         const { _id, ...rest } = product;
