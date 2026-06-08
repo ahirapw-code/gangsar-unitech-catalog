@@ -1,327 +1,285 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import Link from 'next/link';
 import { motion } from 'framer-motion';
-import { ArrowLeft, FileText, Eye, CheckCircle, Clock, XCircle, Trophy } from 'lucide-react';
+import { Send, Plus, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { useAdmin } from '@/contexts/AdminContext';
 import { toast } from 'sonner';
-import { format } from 'date-fns';
+import { useCart } from '@/contexts/CartContext';
 
-function StatusBadge({ status }) {
-  const map = {
-    pending:    { label: 'Pending',     className: 'bg-yellow-100 text-yellow-800 border-yellow-300' },
-    processing: { label: 'Processing',  className: 'bg-blue-100 text-blue-800 border-blue-300' },
-    completed:  { label: 'Completed',   className: 'bg-green-100 text-green-800 border-green-300' },
-    'close-won':  { label: 'Close Won',   className: 'bg-emerald-600 text-white' },
-    'close-lost': { label: 'Close Lost',  className: 'bg-red-100 text-red-800 border-red-300' },
-  };
-  const s = map[status] || { label: status, className: 'bg-gray-100 text-gray-700' };
-  return <span className={`text-xs font-semibold px-2.5 py-1 rounded-full border ${s.className}`}>{s.label}</span>;
-}
-
-export default function AdminRFQPage() {
+export default function RFQPage() {
   const router = useRouter();
-  const { admin, loading, getToken } = useAdmin();
-  const [rfqs, setRfqs] = useState([]);
-  const [selectedRfq, setSelectedRfq] = useState(null);
-  const [loadingData, setLoadingData] = useState(true);
+  const { cart, clearCart } = useCart();
+  const [loading, setLoading] = useState(false);
+  const [formData, setFormData] = useState({
+    fullName: '',
+    companyName: '',
+    phone: '',
+    email: '',
+    notes: '',
+  });
+  const [customProducts, setCustomProducts] = useState([]);
 
-  useEffect(() => {
-    if (!loading && !admin) {
-      router.push('/admin/login');
-    } else if (admin) {
-      fetchRfqs();
+  const addCustomProduct = () => {
+    setCustomProducts([...customProducts, { name: '', sku: '', quantity: 1 }]);
+  };
+
+  const removeCustomProduct = (index) => {
+    setCustomProducts(customProducts.filter((_, i) => i !== index));
+  };
+
+  const updateCustomProduct = (index, field, value) => {
+    const updated = [...customProducts];
+    updated[index][field] = value;
+    setCustomProducts(updated);
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setLoading(true);
+
+    // Combine cart items and custom products
+    const allProducts = [
+      ...cart.map(item => ({
+        name: item.name,
+        sku: item.sku,
+        quantity: item.quantity
+      })),
+      ...customProducts.filter(p => p.name && p.sku)
+    ];
+
+    if (allProducts.length === 0) {
+      toast.error('Please add at least one product to your quotation request');
+      setLoading(false);
+      return;
     }
-  }, [admin, loading, router]);
 
-  async function fetchRfqs() {
-    const token = getToken();
     try {
       const res = await fetch('/api/rfq', {
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
-      const data = await res.json();
-      setRfqs(data || []);
-    } catch (error) {
-      console.error('Error fetching RFQs:', error);
-      toast.error('Failed to load RFQs');
-    } finally {
-      setLoadingData(false);
-    }
-  }
-
-  const handleUpdateStatus = async (rfqId, newStatus) => {
-    const token = getToken();
-    try {
-      const res = await fetch(`/api/rfq/${rfqId}`, {
-        method: 'PUT',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ status: newStatus })
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ...formData,
+          products: allProducts
+        })
       });
 
       const data = await res.json();
-      if (res.ok) {
-        toast.success('RFQ status updated');
-        fetchRfqs();
-        if (selectedRfq && selectedRfq.id === rfqId) {
-          setSelectedRfq({ ...selectedRfq, status: newStatus });
-        }
+
+      if (data.success) {
+        toast.success('Quotation request submitted successfully! Redirecting...');
+        clearCart();
+        setTimeout(() => {
+          router.push('/');
+        }, 1500);
       } else {
-        toast.error('Failed to update: ' + (data.error || res.status));
-        console.error('RFQ update error:', data);
+        toast.error('Failed to submit request. Please try again.');
       }
     } catch (error) {
-      toast.error('An error occurred');
+      console.error('Error submitting RFQ:', error);
+      toast.error('An error occurred. Please try again.');
+    } finally {
+      setLoading(false);
     }
   };
-
-  if (loading || !admin) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#1E8E5A]"></div>
-      </div>
-    );
-  }
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <div className="bg-white border-b">
-        <div className="container mx-auto px-4 py-4">
-          <div className="flex items-center gap-4">
-            <Link href="/admin/dashboard">
-              <Button variant="ghost" size="sm">
-                <ArrowLeft className="mr-2 h-4 w-4" />
-                Back to Dashboard
-              </Button>
-            </Link>
-            <div>
-              <h1 className="text-2xl font-bold text-gray-900">RFQ Management</h1>
-              <p className="text-gray-600">{rfqs.length} quotation requests</p>
-            </div>
-          </div>
+      <div className="bg-gradient-to-r from-[#1E8E5A] to-[#15663f] text-white py-16">
+        <div className="container mx-auto px-4 text-center">
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+          >
+            <h1 className="text-4xl md:text-5xl font-bold mb-4">Request for Quotation</h1>
+            <p className="text-xl text-gray-100 max-w-2xl mx-auto">
+              Get competitive pricing for your industrial sparepart needs. Our team will respond within 24 hours.
+            </p>
+          </motion.div>
         </div>
       </div>
 
-      <div className="container mx-auto px-4 py-8">
-        {loadingData ? (
-          <div className="text-center py-12">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#1E8E5A] mx-auto"></div>
-          </div>
-        ) : rfqs.length > 0 ? (
-          <div className="space-y-4">
-            {rfqs.map((rfq, index) => (
-              <motion.div
-                key={rfq.id}
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: index * 0.05 }}
-              >
+      <div className="container mx-auto px-4 py-12">
+        <div className="max-w-4xl mx-auto">
+          <form onSubmit={handleSubmit}>
+            <div className="grid md:grid-cols-2 gap-8">
+              {/* Contact Information */}
+              <div>
                 <Card>
-                  <CardContent className="p-6">
-                    <div className="flex items-start justify-between mb-4">
-                      <div className="flex-1">
-                        <div className="flex items-center gap-3 mb-2">
-                          <h3 className="font-semibold text-lg">{rfq.companyName}</h3>
-                          <StatusBadge status={rfq.status || 'pending'} />
-                        </div>
-                        <div className="grid grid-cols-2 gap-2 text-sm text-gray-600">
-                          <div>
-                            <strong>Contact:</strong> {rfq.fullName}
-                          </div>
-                          <div>
-                            <strong>Email:</strong> {rfq.email}
-                          </div>
-                          <div>
-                            <strong>Phone:</strong> {rfq.phone}
-                          </div>
-                          <div>
-                            <strong>Date:</strong> {rfq.createdAt ? format(new Date(rfq.createdAt), 'MMM dd, yyyy') : 'N/A'}
-                          </div>
-                        </div>
-                        <div className="mt-3">
-                          <strong className="text-sm text-gray-700">Products:</strong>
-                          <div className="mt-1 space-y-1">
-                            {rfq.products?.slice(0, 3).map((product, idx) => (
-                              <div key={idx} className="text-sm text-gray-600">
-                                • {product.name} (SKU: {product.sku}) - Qty: {product.quantity || 1}
-                              </div>
-                            ))}
-                            {rfq.products?.length > 3 && (
-                              <div className="text-sm text-gray-500">+ {rfq.products.length - 3} more products</div>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                      <div className="flex flex-col gap-2 ml-4 min-w-[130px]">
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => setSelectedRfq(rfq)}
-                        >
-                          <Eye className="h-4 w-4 mr-1" />
-                          View Details
-                        </Button>
-                        {rfq.status === 'pending' && (
-                          <Button
-                            size="sm"
-                            className="bg-blue-600 hover:bg-blue-700 text-white"
-                            onClick={() => handleUpdateStatus(rfq.id, 'processing')}
-                          >
-                            <Clock className="h-4 w-4 mr-1" />
-                            Process
-                          </Button>
-                        )}
-                        {(rfq.status === 'processing' || rfq.status === 'pending') && (
-                          <>
-                            <Button
-                              size="sm"
-                              className="bg-emerald-600 hover:bg-emerald-700 text-white"
-                              onClick={() => handleUpdateStatus(rfq.id, 'close-won')}
-                            >
-                              <Trophy className="h-4 w-4 mr-1" />
-                              Close Won
-                            </Button>
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              className="border-red-300 text-red-600 hover:bg-red-50"
-                              onClick={() => handleUpdateStatus(rfq.id, 'close-lost')}
-                            >
-                              <XCircle className="h-4 w-4 mr-1" />
-                              Close Lost
-                            </Button>
-                          </>
-                        )}
-                      </div>
+                  <CardHeader>
+                    <CardTitle>Contact Information</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div>
+                      <Label htmlFor="fullName">Full Name *</Label>
+                      <Input
+                        id="fullName"
+                        required
+                        value={formData.fullName}
+                        onChange={(e) => setFormData({ ...formData, fullName: e.target.value })}
+                        placeholder="John Doe"
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="companyName">Company Name *</Label>
+                      <Input
+                        id="companyName"
+                        required
+                        value={formData.companyName}
+                        onChange={(e) => setFormData({ ...formData, companyName: e.target.value })}
+                        placeholder="ABC Manufacturing"
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="phone">Phone Number *</Label>
+                      <Input
+                        id="phone"
+                        type="tel"
+                        required
+                        value={formData.phone}
+                        onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                        placeholder="+62 812-3456-7890"
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="email">Email Address *</Label>
+                      <Input
+                        id="email"
+                        type="email"
+                        required
+                        value={formData.email}
+                        onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                        placeholder="john@company.com"
+                      />
                     </div>
                   </CardContent>
                 </Card>
-              </motion.div>
-            ))}
-          </div>
-        ) : (
-          <Card>
-            <CardContent className="p-12 text-center">
-              <FileText className="h-16 w-16 text-gray-300 mx-auto mb-4" />
-              <h3 className="text-lg font-semibold text-gray-900 mb-2">No RFQs yet</h3>
-              <p className="text-gray-600">Quotation requests from customers will appear here</p>
-            </CardContent>
-          </Card>
-        )}
-      </div>
-
-      {/* RFQ Detail Dialog */}
-      <Dialog open={!!selectedRfq} onOpenChange={() => setSelectedRfq(null)}>
-        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
-          {selectedRfq && (
-            <>
-              <DialogHeader>
-                <DialogTitle>RFQ Details - {selectedRfq.companyName}</DialogTitle>
-              </DialogHeader>
-              <div className="space-y-4">
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="text-sm font-semibold text-gray-700">Company Name</label>
-                    <p className="text-gray-900">{selectedRfq.companyName}</p>
-                  </div>
-                  <div>
-                    <label className="text-sm font-semibold text-gray-700">Contact Person</label>
-                    <p className="text-gray-900">{selectedRfq.fullName}</p>
-                  </div>
-                  <div>
-                    <label className="text-sm font-semibold text-gray-700">Email</label>
-                    <p className="text-gray-900">{selectedRfq.email}</p>
-                  </div>
-                  <div>
-                    <label className="text-sm font-semibold text-gray-700">Phone</label>
-                    <p className="text-gray-900">{selectedRfq.phone}</p>
-                  </div>
-                  <div>
-                    <label className="text-sm font-semibold text-gray-700">Status</label>
-                    <p>
-                      <StatusBadge status={selectedRfq.status || 'pending'} />
-                    </p>
-                  </div>
-                  <div>
-                    <label className="text-sm font-semibold text-gray-700">Date Submitted</label>
-                    <p className="text-gray-900">
-                      {selectedRfq.createdAt ? format(new Date(selectedRfq.createdAt), 'MMM dd, yyyy HH:mm') : 'N/A'}
-                    </p>
-                  </div>
-                </div>
-
-                <div>
-                  <label className="text-sm font-semibold text-gray-700 mb-2 block">Requested Products</label>
-                  <div className="border rounded-lg p-4 space-y-3 bg-gray-50">
-                    {selectedRfq.products?.map((product, idx) => (
-                      <div key={idx} className="flex justify-between items-center p-3 bg-white rounded border">
-                        <div>
-                          <p className="font-medium">{product.name}</p>
-                          <p className="text-sm text-gray-600">SKU: {product.sku}</p>
-                        </div>
-                        <div className="text-right">
-                          <p className="text-sm text-gray-600">Quantity</p>
-                          <p className="font-semibold">{product.quantity || 1}</p>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                {selectedRfq.notes && (
-                  <div>
-                    <label className="text-sm font-semibold text-gray-700 mb-2 block">Additional Notes</label>
-                    <div className="border rounded-lg p-4 bg-gray-50">
-                      <p className="text-gray-900 whitespace-pre-wrap">{selectedRfq.notes}</p>
-                    </div>
-                  </div>
-                )}
-
-                <div className="flex flex-wrap gap-2 pt-4 border-t">
-                  {selectedRfq.status === 'pending' && (
-                    <Button
-                      className="bg-blue-600 hover:bg-blue-700 text-white"
-                      onClick={() => handleUpdateStatus(selectedRfq.id, 'processing')}
-                    >
-                      <Clock className="h-4 w-4 mr-1" /> Mark as Processing
-                    </Button>
-                  )}
-                  {(selectedRfq.status === 'pending' || selectedRfq.status === 'processing') && (
-                    <>
-                      <Button
-                        className="bg-emerald-600 hover:bg-emerald-700 text-white"
-                        onClick={() => handleUpdateStatus(selectedRfq.id, 'close-won')}
-                      >
-                        <Trophy className="h-4 w-4 mr-1" /> Close Won
-                      </Button>
-                      <Button
-                        variant="outline"
-                        className="border-red-300 text-red-600 hover:bg-red-50"
-                        onClick={() => handleUpdateStatus(selectedRfq.id, 'close-lost')}
-                      >
-                        <XCircle className="h-4 w-4 mr-1" /> Close Lost
-                      </Button>
-                    </>
-                  )}
-                  <Button variant="outline" onClick={() => setSelectedRfq(null)}>
-                    Close
-                  </Button>
-                </div>
               </div>
-            </>
-          )}
-        </DialogContent>
-      </Dialog>
+
+              {/* Products */}
+              <div>
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Products Requested</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    {/* Cart Items */}
+                    {cart.length > 0 && (
+                      <div className="space-y-2">
+                        <Label>From Cart ({cart.length} items)</Label>
+                        {cart.map((item) => (
+                          <div key={item.id} className="bg-gray-50 p-3 rounded-lg">
+                            <div className="font-medium text-sm">{item.name}</div>
+                            <div className="text-xs text-gray-600">
+                              SKU: {item.sku} | Qty: {item.quantity}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
+                    {/* Custom Products */}
+                    <div>
+                      <div className="flex items-center justify-between mb-2">
+                        <Label>Additional Products</Label>
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          onClick={addCustomProduct}
+                        >
+                          <Plus className="h-4 w-4 mr-1" />
+                          Add Product
+                        </Button>
+                      </div>
+                      {customProducts.map((product, index) => (
+                        <div key={index} className="bg-gray-50 p-3 rounded-lg mb-2 space-y-2">
+                          <div className="flex justify-between items-start">
+                            <Input
+                              placeholder="Product Name"
+                              value={product.name}
+                              onChange={(e) => updateCustomProduct(index, 'name', e.target.value)}
+                              className="mb-2"
+                            />
+                            <Button
+                              type="button"
+                              size="icon"
+                              variant="ghost"
+                              onClick={() => removeCustomProduct(index)}
+                              className="ml-2"
+                            >
+                              <X className="h-4 w-4" />
+                            </Button>
+                          </div>
+                          <div className="grid grid-cols-2 gap-2">
+                            <Input
+                              placeholder="SKU"
+                              value={product.sku}
+                              onChange={(e) => updateCustomProduct(index, 'sku', e.target.value)}
+                            />
+                            <Input
+                              type="number"
+                              placeholder="Qty"
+                              min="1"
+                              value={product.quantity}
+                              onChange={(e) => updateCustomProduct(index, 'quantity', parseInt(e.target.value))}
+                            />
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+
+                    {/* Notes */}
+                    <div>
+                      <Label htmlFor="notes">Additional Notes</Label>
+                      <Textarea
+                        id="notes"
+                        value={formData.notes}
+                        onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+                        placeholder="Any specific requirements or questions..."
+                        rows={4}
+                      />
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+            </div>
+
+            {/* Submit */}
+            <div className="mt-8">
+              <Card>
+                <CardContent className="p-6">
+                  <div className="text-center">
+                    <p className="text-gray-600 mb-6">
+                      By submitting this form, you agree to be contacted by our sales team regarding your quotation request.
+                    </p>
+                    <Button
+                      type="submit"
+                      size="lg"
+                      disabled={loading}
+                      className="bg-[#1E8E5A] hover:bg-[#15663f] min-w-[200px]"
+                    >
+                      {loading ? (
+                        <span>Submitting...</span>
+                      ) : (
+                        <>
+                          <Send className="mr-2 h-5 w-5" />
+                          Submit Request
+                        </>
+                      )}
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          </form>
+        </div>
+      </div>
     </div>
   );
 }
