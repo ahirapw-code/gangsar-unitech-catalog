@@ -275,7 +275,7 @@ export default function ProductsPage() {
                         )}
                       </div>
                       <div className="flex gap-2">
-                        <Link href={`/products/${product.slug}`} className="flex-1">
+                        <Link href={`/products/${product.slug || product.id}`} className="flex-1">
                           <Button size="sm" variant="outline" className="w-full text-xs">View</Button>
                         </Link>
                         <Button
