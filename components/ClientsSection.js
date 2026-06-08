@@ -3,10 +3,10 @@
 import { useEffect, useRef } from 'react';
 
 const logos = [
-  { name: 'Mayora',   src: '/logo-mayora.png',   dark: true  },
-  { name: 'Wismilak', src: '/logo-wismilak.png', dark: true  },
-  { name: 'Wings',    src: '/logo-wings.svg',    dark: false },
-  { name: 'Sinarmas', src: '/logo-sinarmas.png', dark: true  },
+  { name: 'Mayora',   src: '/logo-mayora.svg'   },
+  { name: 'Wismilak', src: '/logo-wismilak.svg' },
+  { name: 'Wings',    src: '/logo-wings.svg'    },
+  { name: 'Sinarmas', src: '/logo-sinarmas.svg' },
 ];
 
 const tripled = [...logos, ...logos, ...logos];
@@ -51,29 +51,22 @@ export default function ClientsSection() {
         onMouseEnter={() => { pausedRef.current = true; }}
         onMouseLeave={() => { pausedRef.current = false; }}
       >
-        {/* Fade edges */}
         <div className="pointer-events-none absolute left-0 top-0 h-full w-32 z-10"
           style={{ background: 'linear-gradient(to right, #f9fafb, transparent)' }} />
         <div className="pointer-events-none absolute right-0 top-0 h-full w-32 z-10"
           style={{ background: 'linear-gradient(to left, #f9fafb, transparent)' }} />
 
-        <div ref={trackRef} className="flex items-center gap-6 w-max py-4">
+        <div ref={trackRef} className="flex items-center gap-8 w-max py-4">
           {tripled.map((logo, i) => (
             <div
               key={i}
-              style={{ backgroundColor: '#ffffff', borderRadius: 16, border: '1px solid #e5e7eb', padding: 20, width: 180, height: 100, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, boxShadow: '0 1px 4px rgba(0,0,0,0.06)' }}
+              className="flex-shrink-0 flex items-center justify-center bg-white rounded-2xl border border-gray-200 shadow-sm hover:shadow-md transition-shadow"
+              style={{ width: 180, height: 100, padding: 20 }}
             >
               <img
                 src={logo.src}
                 alt={logo.name}
-                style={{
-                  maxWidth: '100%',
-                  maxHeight: '100%',
-                  objectFit: 'contain',
-                  // multiply blends dark/black bg away on white card
-                  mixBlendMode: logo.dark ? 'multiply' : 'normal',
-                  display: 'block',
-                }}
+                style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }}
               />
             </div>
           ))}
