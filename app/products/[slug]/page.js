@@ -48,7 +48,7 @@ export default function ProductDetailPage() {
     const message = encodeURIComponent(
       `Hi, I'm interested in:\n${product.name}\nSKU: ${product.sku}\n\nPlease provide more information.`
     );
-    window.open(`https://wa.me/6281234567890?text=${message}`, '_blank');
+    window.open(`https://wa.me/6285771919132?text=${message}`, '_blank');
   };
 
   if (loading) {
