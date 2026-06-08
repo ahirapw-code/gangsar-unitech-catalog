@@ -194,7 +194,7 @@ export default function HomePage() {
               Explore our comprehensive range of industrial spareparts and machinery components
             </p>
           </div>
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-6">
             {categories.map((category, index) => (
               <motion.div
                 key={category.id}
@@ -203,18 +203,19 @@ export default function HomePage() {
                 transition={{ delay: index * 0.05 }}
               >
                 <Link href={`/products?category=${category.slug}`}>
-                  <Card className="hover:shadow-lg transition-all hover:scale-105 cursor-pointer">
-                    <div className="relative h-32 bg-gradient-to-br from-gray-100 to-gray-200 overflow-hidden">
+                  <Card className="hover:shadow-xl transition-all hover:scale-105 cursor-pointer overflow-hidden group">
+                    <div className="relative h-48 bg-gradient-to-br from-gray-100 to-gray-200 overflow-hidden">
                       <Image
                         src={category.image}
                         alt={category.name}
                         fill
-                        className="object-cover opacity-80"
+                        className="object-cover opacity-90 group-hover:scale-110 transition-transform duration-300"
                       />
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent" />
+                      <h3 className="absolute bottom-3 left-0 right-0 text-center text-white font-bold text-base drop-shadow">
+                        {category.name}
+                      </h3>
                     </div>
-                    <CardContent className="p-4 text-center">
-                      <h3 className="font-semibold text-sm">{category.name}</h3>
-                    </CardContent>
                   </Card>
                 </Link>
               </motion.div>
