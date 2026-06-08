@@ -1,17 +1,44 @@
-// app/api/test-email/route.js - DELETE after testing
 import { NextResponse } from 'next/server';
-import { sendEmail } from '@/lib/email';
+import nodemailer from 'nodemailer';
 
 export async function GET() {
-  const result = await sendEmail({
-    to: process.env.ADMIN_EMAIL || 'admin@gangsarunitech.id',
-    subject: 'Test Email - Gangsar Unitech',
-    html: '<p>Test email berhasil dikirim!</p>'
-  });
-  return NextResponse.json({
-    result,
-    smtpUser: process.env.SMTP_USER ? '✅ SET' : '❌ NOT SET',
-    smtpPass: process.env.SMTP_PASS ? '✅ SET' : '❌ NOT SET',
-    adminEmail: process.env.ADMIN_EMAIL || 'admin@gangsarunitech.id (default)',
-  });
+  const smtpUser = process.env.SMTP_USER;
+  const smtpPass = process.env.SMTP_PASS;
+
+  // Show exact values (masked) for debugging
+  const debugInfo = {
+    smtpUser: smtpUser || 'NOT SET',
+    smtpUserLength: smtpUser?.length,
+    smtpPassLength: smtpPass?.length,
+    smtpPassFirst4: smtpPass?.substring(0, 4),
+    smtpPassLast4: smtpPass?.substring(smtpPass.length - 4),
+    hasSpaces: smtpPass?.includes(' '),
+  };
+
+  try {
+    const transporter = nodemailer.createTransport({
+      service: 'gmail',  // use service instead of host/port
+      auth: {
+        user: smtpUser,
+        pass: smtpPass,
+      },
+    });
+
+    await transporter.verify();
+
+    await transporter.sendMail({
+      from: `Gangsar Unitech <${smtpUser}>`,
+      to: smtpUser,
+      subject: 'Test Email Gangsar Unitech',
+      html: '<p>Email berhasil!</p>',
+    });
+
+    return NextResponse.json({ success: true, debugInfo });
+  } catch (error) {
+    return NextResponse.json({ 
+      success: false, 
+      error: error.message,
+      debugInfo 
+    });
+  }
 }
