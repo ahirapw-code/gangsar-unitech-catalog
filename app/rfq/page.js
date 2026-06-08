@@ -71,7 +71,7 @@ export default function RFQPage() {
 
       const data = await res.json();
 
-      if (data.success) {
+      if (res.ok) {
         toast.success('Quotation request submitted successfully! Redirecting...');
         clearCart();
         setTimeout(() => {
