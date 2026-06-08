@@ -2,9 +2,18 @@
 
 import Link from 'next/link';
 import { MapPin, Phone, Mail } from 'lucide-react';
+import { useState, useEffect } from 'react';
 
 export default function Footer() {
   const currentYear = new Date().getFullYear();
+  const [categories, setCategories] = useState([]);
+
+  useEffect(() => {
+    fetch('/api/categories', { cache: 'no-store' })
+      .then(res => res.ok ? res.json() : [])
+      .then(data => setCategories(data || []))
+      .catch(() => setCategories([]));
+  }, []);
 
   return (
     <footer className="bg-gray-900 text-gray-300">
@@ -66,26 +75,20 @@ export default function Footer() {
           <div>
             <h3 className="text-white font-semibold mb-4">Categories</h3>
             <ul className="space-y-2">
-              <li>
-                <Link href="/products?category=bearings" className="hover:text-[#1E8E5A] transition-colors">
-                  Bearings
-                </Link>
-              </li>
-              <li>
-                <Link href="/products?category=industrial-valves" className="hover:text-[#1E8E5A] transition-colors">
-                  Industrial Valves
-                </Link>
-              </li>
-              <li>
-                <Link href="/products?category=gearboxes" className="hover:text-[#1E8E5A] transition-colors">
-                  Gearboxes
-                </Link>
-              </li>
-              <li>
-                <Link href="/products?category=pumps" className="hover:text-[#1E8E5A] transition-colors">
-                  Pumps
-                </Link>
-              </li>
+              {categories.length > 0 ? (
+                categories.map((category) => (
+                  <li key={category.id}>
+                    <Link
+                      href={`/products?category=${category.slug}`}
+                      className="hover:text-[#1E8E5A] transition-colors"
+                    >
+                      {category.name}
+                    </Link>
+                  </li>
+                ))
+              ) : (
+                <li className="text-gray-500 text-sm">Loading...</li>
+              )}
             </ul>
           </div>
 
