@@ -82,7 +82,7 @@ export function CartProvider({ children }) {
 
   const sendWhatsAppInquiry = () => {
     const message = generateWhatsAppMessage();
-    const phoneNumber = '6281234567890'; // Replace with actual WhatsApp number
+    const phoneNumber = '6285771919132'; // Replace with actual WhatsApp number
     const url = `https://wa.me/${phoneNumber}?text=${message}`;
     window.open(url, '_blank');
   };
