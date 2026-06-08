@@ -59,16 +59,19 @@ export async function GET(request) {
 
       // Single product by ID
       const productId = segments[1];
-      if (productId && productId.length === 24) {
-        const { ObjectId } = await import('mongodb');
-        try {
-          const product = await db.collection('products').findOne({ _id: new ObjectId(productId) });
-          if (!product) return NextResponse.json({ error: 'Not found' }, { status: 404 });
-          const { _id, ...rest } = product;
-          return NextResponse.json({ id: _id.toString(), ...rest });
-        } catch {
-          return NextResponse.json({ error: 'Invalid ID' }, { status: 400 });
+      if (productId) {
+        let product = null;
+        // Try ObjectId first (24-char hex), fallback to uuid id field
+        if (/^[a-f\d]{24}$/i.test(productId)) {
+          const { ObjectId } = await import('mongodb');
+          product = await db.collection('products').findOne({ _id: new ObjectId(productId) });
         }
+        if (!product) {
+          product = await db.collection('products').findOne({ id: productId });
+        }
+        if (!product) return NextResponse.json({ error: 'Not found' }, { status: 404 });
+        const { _id, ...rest } = product;
+        return NextResponse.json({ id: rest.id || _id.toString(), ...rest });
       }
 
       const [products, total] = await Promise.all([
@@ -76,7 +79,7 @@ export async function GET(request) {
         db.collection('products').countDocuments(filter),
       ]);
 
-      const serialized = products.map(({ _id, ...rest }) => ({ id: _id.toString(), ...rest }));
+      const serialized = products.map(({ _id, ...rest }) => ({ id: rest.id || _id.toString(), ...rest }));
 
       return NextResponse.json({
         products: serialized,
@@ -164,7 +167,7 @@ export async function PUT(request) {
       if (/^[a-f\d]{24}$/i.test(id)) {
         query = { _id: new ObjectId(id) };
       } else {
-        query = { $or: [{ _id: id }, { id: id }] };
+        query = { id: id };
       }
       const result = await db.collection('products').updateOne(
         query,
@@ -179,7 +182,7 @@ export async function PUT(request) {
       if (/^[a-f\d]{24}$/i.test(id)) {
         query = { _id: new ObjectId(id) };
       } else {
-        query = { $or: [{ _id: id }, { id: id }] };
+        query = { id: id };
       }
       const result = await db.collection('rfqs').updateOne(
         query,
@@ -214,7 +217,7 @@ export async function DELETE(request) {
       if (/^[a-f\d]{24}$/i.test(id)) {
         query = { _id: new ObjectId(id) };
       } else {
-        query = { $or: [{ _id: id }, { id: id }] };
+        query = { id: id };
       }
       await db.collection('products').deleteOne(query);
       return NextResponse.json({ success: true });
@@ -225,7 +228,7 @@ export async function DELETE(request) {
       if (/^[a-f\d]{24}$/i.test(id)) {
         query = { _id: new ObjectId(id) };
       } else {
-        query = { $or: [{ _id: id }, { id: id }] };
+        query = { id: id };
       }
       await db.collection('rfqs').deleteOne(query);
       return NextResponse.json({ success: true });
