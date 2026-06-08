@@ -163,7 +163,7 @@ export default function HomePage() {
                         </div>
                       </div>
                       <div className="flex gap-2">
-                        <Link href={`/products/${product.slug}`} className="flex-1">
+                        <Link href={`/products/${product.slug || product.id}`} className="flex-1">
                           <Button variant="outline" className="w-full">
                             Details
                           </Button>
