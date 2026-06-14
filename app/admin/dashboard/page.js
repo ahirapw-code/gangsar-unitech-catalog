@@ -13,7 +13,8 @@ import {
   Plus,
   Edit,
   Trash2,
-  Eye
+  Eye,
+  BookOpen
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -279,6 +280,37 @@ export default function AdminDashboardPage() {
               ) : (
                 <div className="text-center py-8 text-gray-500">No RFQs yet</div>
               )}
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Blog Management Card */}
+        <div className="mb-8">
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between">
+              <CardTitle className="flex items-center gap-2">
+                <BookOpen className="h-5 w-5 text-[#1E8E5A]" />
+                Blog & Artikel
+              </CardTitle>
+              <div className="flex gap-2">
+                <Link href="/admin/blog/add">
+                  <Button size="sm" className="bg-[#1E8E5A] hover:bg-[#15663f]">
+                    <Plus className="mr-2 h-4 w-4" />
+                    Tulis Artikel
+                  </Button>
+                </Link>
+                <Link href="/admin/blog">
+                  <Button size="sm" variant="outline">
+                    <BookOpen className="mr-2 h-4 w-4" />
+                    Kelola Blog
+                  </Button>
+                </Link>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <p className="text-sm text-gray-500">
+                Kelola artikel blog untuk meningkatkan SEO website. Artikel yang dipublikasikan akan muncul di halaman <code className="bg-gray-100 px-1 rounded">/blog</code>.
+              </p>
             </CardContent>
           </Card>
         </div>
