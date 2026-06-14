@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { put, del } from '@vercel/blob';
+import { addWatermark } from '@/lib/watermark';
 
 export async function POST(request) {
   try {
@@ -21,15 +22,35 @@ export async function POST(request) {
       );
     }
 
-    // Generate unique filename
-    const timestamp = Date.now();
-    const filename = file.name.replace(/\s+/g, '-').toLowerCase();
-    const uniqueFilename = `products/${timestamp}-${filename}`;
+    // Konversi file ke buffer
+    const arrayBuffer = await file.arrayBuffer();
+    const originalBuffer = Buffer.from(arrayBuffer);
 
-    // Upload to Vercel Blob
-    const blob = await put(uniqueFilename, file, {
+    // Proses watermark (hanya untuk image)
+    let finalBuffer = originalBuffer;
+    const mimeType = file.type || 'image/jpeg';
+
+    if (mimeType.startsWith('image/')) {
+      try {
+        finalBuffer = await addWatermark(originalBuffer);
+        console.log('[Upload] Watermark berhasil diterapkan');
+      } catch (wmError) {
+        console.warn('[Upload] Gagal menerapkan watermark, upload gambar asli:', wmError.message);
+        // Fallback: upload gambar asli tanpa watermark
+        finalBuffer = originalBuffer;
+      }
+    }
+
+    // Generate unique filename (selalu .jpg karena output sharp adalah jpeg)
+    const timestamp = Date.now();
+    const baseName = file.name.replace(/\s+/g, '-').toLowerCase().replace(/\.[^.]+$/, '');
+    const uniqueFilename = `products/${timestamp}-${baseName}.jpg`;
+
+    // Upload buffer hasil watermark ke Vercel Blob
+    const blob = await put(uniqueFilename, finalBuffer, {
       access: 'public',
       addRandomSuffix: false,
+      contentType: 'image/jpeg',
     });
 
     return NextResponse.json({
