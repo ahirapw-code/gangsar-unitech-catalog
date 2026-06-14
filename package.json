@@ -2,6 +2,9 @@
     "name": "nextjs-mongo-template",
     "version": "0.1.0",
     "private": true,
+    "engines": {
+        "node": "20.x"
+    },
     "scripts": {
         "dev": "NODE_OPTIONS='--max-old-space-size=512' next dev --hostname 0.0.0.0 --port 3000",
         "dev:no-reload": "next dev --hostname 0.0.0.0 --port 3000",
@@ -64,6 +67,7 @@
         "react-hook-form": "7.58.1",
         "react-resizable-panels": "3.0.3",
         "recharts": "2.15.3",
+        "sharp": "^0.33.5",
         "sonner": "2.0.5",
         "swr": "2.3.8",
         "tailwind-merge": "3.3.1",
@@ -71,7 +75,6 @@
         "uuid": "9.0.1",
         "vaul": "1.1.2",
         "zod": "3.25.67"
-        "sharp": "^0.33.5"
     },
     "devDependencies": {
         "@types/lodash": "4.17.24",
@@ -85,4 +88,3 @@
     },
     "packageManager": "yarn@1.22.22+sha512.a6b2f7906b721bba3d67d4aff083df04dad64c399707841b7acf00f6b133b7ac24255f2652fa22ae3534329dc6180534e98d17432037ff6fd140556e2bb3137e"
 }
-
