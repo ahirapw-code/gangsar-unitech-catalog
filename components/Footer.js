@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import Image from 'next/image';
 import { MapPin, Phone, Mail } from 'lucide-react';
 import { useState, useEffect } from 'react';
 
@@ -21,13 +22,14 @@ export default function Footer() {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
           {/* Company Info */}
           <div>
-            <div className="flex items-center space-x-2 mb-4">
-              <div className="w-10 h-10 bg-gradient-to-br from-[#1E8E5A] to-[#15663f] rounded-lg flex items-center justify-center">
-                <span className="text-white font-bold text-xl">GU</span>
-              </div>
-              <div>
-                <div className="font-bold text-white text-lg">Gangsar Unitech</div>
-              </div>
+            <div className="flex items-center mb-4">
+              <Image
+                src="/logo.svg"
+                alt="PT Gangsar Unitech Indonesia"
+                width={160}
+                height={70}
+                className="h-12 w-auto object-contain brightness-0 invert"
+              />
             </div>
             <p className="text-sm text-gray-400">
               Your trusted partner for industrial machinery spareparts and engineering solutions in Surabaya, Indonesia.

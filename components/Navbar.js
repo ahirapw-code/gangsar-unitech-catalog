@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
+import Image from 'next/image';
 import { Menu, X, ShoppingCart, Search, Phone } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useCart } from '@/contexts/CartContext';
@@ -24,14 +25,15 @@ export default function Navbar() {
       <div className="container mx-auto px-4">
         <div className="flex items-center justify-between h-16">
           {/* Logo */}
-          <Link href="/" className="flex items-center space-x-2">
-            <div className="w-10 h-10 bg-gradient-to-br from-[#1E8E5A] to-[#15663f] rounded-lg flex items-center justify-center">
-              <span className="text-white font-bold text-xl">GU</span>
-            </div>
-            <div className="hidden sm:block">
-              <div className="font-bold text-lg text-gray-900">Gangsar Unitech</div>
-              <div className="text-xs text-gray-500">Industrial Solutions</div>
-            </div>
+          <Link href="/" className="flex items-center">
+            <Image
+              src="/logo.svg"
+              alt="PT Gangsar Unitech Indonesia"
+              width={160}
+              height={70}
+              className="h-12 w-auto object-contain"
+              priority
+            />
           </Link>
 
           {/* Desktop Navigation */}
